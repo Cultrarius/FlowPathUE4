@@ -1,0 +1,45 @@
+# Created by .ignore support plugin (hsz.mobi)
+### C++ template
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.bin
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+/.idea/
+/cmake-build-debug/
+/Intermediate/
+/Binaries/
+/.vs/
+/Saved/
+/FlowPath.VC.VC.opendb
+/FlowPath.VC.db
+/FlowPath.sln
