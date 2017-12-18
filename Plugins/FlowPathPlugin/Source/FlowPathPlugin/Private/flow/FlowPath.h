@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <set>
-#include <map>
 #include <memory>
 #include "FlowTile.h"
 
@@ -13,18 +11,15 @@ namespace flow {
     
     const BYTE EMPTY = 1;
     const BYTE BLOCKED = 255;
-    typedef std::pair<int, int> Coordinates;
-    typedef std::pair<float, float> Force;
 
     struct Agent {
-        Force acceleration;
+        FVector2D acceleration;
         float xPos;
         float yPos;
         float separationForce;
 
         bool isSeekingTarget;
-        int targetX;
-        int targetY;
+        FVector2D target;
     };
 
     class FlowPath {
@@ -32,19 +27,19 @@ namespace flow {
         //TODO: use empty data instead of tile
         std::unique_ptr<FlowTile> emptyTile;
         int32 tileLength;
-        std::map<Coordinates, FlowTile *> tileMap;
-        std::map<Agent *, std::unique_ptr<Agent>> agents;
+        TMap<FIntPoint, FlowTile *> tileMap;
+        TMap<Agent *, std::unique_ptr<Agent>> agents;
 
-        void updatePortals(Coordinates tileCoordinates);
+        void updatePortals(FIntPoint tileCoordinates);
 
-        FlowTile *getTile(Coordinates tileCoordinates);
+        FlowTile *getTile(FIntPoint tileCoordinates);
 
     public:
         explicit FlowPath(int32 tileLength);
 
         ~FlowPath();
 
-        void updateMapTile(int tileX, int tileY, const TArray<BYTE> &tileData);
+        void updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileData);
 
         //TODO remove, debug only
         void printPortals() const;

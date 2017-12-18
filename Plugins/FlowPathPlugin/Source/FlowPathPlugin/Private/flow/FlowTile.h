@@ -17,7 +17,7 @@ namespace flow {
 
         explicit FlowTile(const TArray<BYTE> &tileData, int32 tileLength);
 
-        TArray<int32> getPortalsIndicesFor(int x, int y) const;
+        TArray<int32> getPortalsIndicesFor(int32 x, int32 y) const;
 
         void connectOverlappingPortals(FlowTile &tile, Orientation side);
     };

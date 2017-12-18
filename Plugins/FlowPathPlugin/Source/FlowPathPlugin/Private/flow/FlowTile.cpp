@@ -3,7 +3,6 @@
 //
 
 #include "FlowTile.h"
-#include <unordered_set>
 #include <queue>
 #include "FlowPath.h"
 
@@ -14,7 +13,7 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
     int32 maxIndex = tileLength - 1;
 
     //find left portals
-    int start = -1;
+    int32 start = -1;
     for (int32 i = 0; i < tileLength; i++) {
         auto val = tileData[i * tileLength];
         if (start != -1 && val == BLOCKED) {
@@ -78,14 +77,14 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
     TArray<BYTE> floodData = tileData;
     for (int32 y = 0; y < tileLength; y++) {
         for (int32 x = 0; x < tileLength; x++) {
-            int index = x + y * tileLength;
+            int32 index = x + y * tileLength;
             auto val = floodData[index];
             if (val > 0 && val != BLOCKED) {
                 floodData[index] = 0;
                 auto indices = getPortalsIndicesFor(x, y);
                 TSet<int32> connected;
                 connected.Append(indices);
-                queue<Coordinates> todo;
+                queue<FIntPoint> todo;
                 todo.emplace(x + 1, y);
                 todo.emplace(x - 1, y);
                 todo.emplace(x, y + 1);
@@ -93,9 +92,9 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
 
                 for (; !todo.empty(); todo.pop()) {
                     auto &coord = todo.front();
-                    int floodX = coord.first;
-                    int floodY = coord.second;
-                    int floodIndex = floodX + floodY * tileLength;
+                    int32 floodX = coord.X;
+                    int32 floodY = coord.Y;
+                    int32 floodIndex = floodX + floodY * tileLength;
                     if (floodX < 0 ||  (floodX - tileLength) >= 0 || floodY < 0 || (floodY - tileLength) >= 0 ||
                         floodData[floodIndex] == 0 || floodData[floodIndex] == BLOCKED) {
                         continue;
@@ -111,7 +110,7 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
                 }
 
                 TArray<Portal *> connectedPortals;
-                for (int pIndex : connected) {
+                for (int32 pIndex : connected) {
                     connectedPortals.Add(&portals[pIndex]);
                 }
                 for (auto portal : connectedPortals) {
@@ -123,9 +122,9 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
     }
 }
 
-TArray<int32> FlowTile::getPortalsIndicesFor(int x, int y) const {
+TArray<int32> FlowTile::getPortalsIndicesFor(int32 x, int32 y) const {
     TArray<int32> result;
-    for (int i = 0; i < portals.Num(); i++) {
+    for (int32 i = 0; i < portals.Num(); i++) {
         const Portal &portal = portals[i];
         if (portal.startX <= x && portal.endX >= x && portal.startY <= y && portal.endY >= y) {
             result.Add(i);
@@ -147,10 +146,10 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
                 continue;
             }
 
-            int startX = max(otherPortal.startX, thisPortal.startX);
-            int startY = max(otherPortal.startY, thisPortal.startY);
-            int endX = min(otherPortal.endX, thisPortal.endX);
-            int endY = min(otherPortal.endY, thisPortal.endY);
+            int32 startX = max(otherPortal.startX, thisPortal.startX);
+            int32 startY = max(otherPortal.startY, thisPortal.startY);
+            int32 endX = min(otherPortal.endX, thisPortal.endX);
+            int32 endY = min(otherPortal.endY, thisPortal.endY);
             if (((side == TOP || side == BOTTOM) && startX <= endX) ||
                 ((side == LEFT || side == RIGHT) && startY <= endY)) {
                 otherPortal.connected.Add(&thisPortal);

@@ -9,15 +9,15 @@ using namespace std;
 using namespace flow;
 
 FlowPath::FlowPath(int32 tileLength) : tileLength(tileLength) {
-    int size = tileLength * tileLength;
+    int32 size = tileLength * tileLength;
     TArray<BYTE> mapData;
-    for (int i = 0; i < size; i++) {
+    for (int32 i = 0; i < size; i++) {
         mapData[i] = 1;
     }
     emptyTile = unique_ptr<FlowTile>(new FlowTile(mapData, tileLength));
 }
 
-void FlowPath::updateMapTile(int tileX, int tileY, const TArray<BYTE> &tileData) {
+void FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileData) {
     if (tileData.Num() != tileLength * tileLength) {
         throw runtime_error("Invalid tile size");
     }
@@ -33,41 +33,38 @@ void FlowPath::updateMapTile(int tileX, int tileY, const TArray<BYTE> &tileData)
     }
 
     FlowTile *tile = isEmpty ? emptyTile.get() : new FlowTile(tileData, tileLength);
-    auto coord = make_pair(tileX, tileY);
-    const auto &iter = tileMap.find(coord);
-    if (iter != tileMap.end()) {
-        delete iter->second;
-        tileMap.erase(iter);
+    FIntPoint coord(tileX, tileY);
+    auto existingTile = tileMap.Find(coord);
+    if (existingTile != nullptr) {
+        delete *existingTile;
+        tileMap.Remove(coord);
     }
-    tileMap.emplace(coord, tile);
+    tileMap.Add(coord, tile);
     updatePortals(coord);
 }
 
 void FlowPath::addAgent(unique_ptr<Agent> agent) {
-    agents.emplace(agent.get(), move(agent));
+    agents.Emplace(agent.get(), move(agent));
 }
 
 void FlowPath::killAgent(Agent *agent) {
-    auto iter = agents.find(agent);
-    if (iter != agents.end()) {
-        agents.erase(iter);
-    }
+    agents.Remove(agent);
 }
 
 void FlowPath::updateAgents() {
 
 }
 
-void FlowPath::updatePortals(Coordinates tileCoordinates) {
+void FlowPath::updatePortals(FIntPoint tileCoordinates) {
     FlowTile *tile = getTile(tileCoordinates);
     if (tile == nullptr) {
         return;
     }
 
-    Coordinates left = make_pair(tileCoordinates.first - 1, tileCoordinates.second);
-    Coordinates right = make_pair(tileCoordinates.first + 1, tileCoordinates.second);
-    Coordinates top = make_pair(tileCoordinates.first, tileCoordinates.second - 1);
-    Coordinates bottom = make_pair(tileCoordinates.first, tileCoordinates.second + 1);
+    FIntPoint left(tileCoordinates.X - 1, tileCoordinates.Y);
+    FIntPoint right(tileCoordinates.X + 1, tileCoordinates.Y);
+    FIntPoint top(tileCoordinates.X, tileCoordinates.Y - 1);
+    FIntPoint bottom(tileCoordinates.X, tileCoordinates.Y + 1);
 
     FlowTile *leftTile = getTile(left);
     FlowTile *rightTile = getTile(right);
@@ -90,24 +87,21 @@ void FlowPath::updatePortals(Coordinates tileCoordinates) {
 
 FlowPath::~FlowPath() {
     for (auto mapPair : tileMap) {
-        if (mapPair.second != emptyTile.get()) {
-            delete mapPair.second;
+        if (mapPair.Value != emptyTile.get()) {
+            delete mapPair.Value;
         }
     }
 }
 
-FlowTile *FlowPath::getTile(Coordinates tileCoordinates) {
-    auto iter = tileMap.find(tileCoordinates);
-    if (iter == tileMap.end()) {
-        return nullptr;
-    }
-    return iter->second;
+FlowTile *FlowPath::getTile(FIntPoint tileCoordinates) {
+    auto tile = tileMap.Find(tileCoordinates);
+    return tile == nullptr ? nullptr : *tile;
 }
 
 void FlowPath::printPortals() const {
     for (auto& tilePair : tileMap) {
-        cout << tilePair.first.first << ", " << tilePair.first.second << ": \n";
-        for (auto& portal : tilePair.second->portals) {
+        cout << tilePair.Key.X << ", " << tilePair.Key.Y << ": \n";
+        for (auto& portal : tilePair.Value->portals) {
             for (auto& connected : portal.connected) {
                 if (connected->parentTile != portal.parentTile) {
                     cout << "  (" << portal.startX << ", " << portal.startY << " - " << portal.endX << ", " << portal.endY << ") -> ("

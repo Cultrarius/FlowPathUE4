@@ -5,7 +5,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include <set>
 
 namespace flow {
     enum Orientation {
@@ -15,15 +14,15 @@ namespace flow {
     class FlowTile;
 
     struct Portal {
-        int startX;
-        int startY;
-        int endX;
-        int endY;
+        int32 startX;
+        int32 startY;
+        int32 endX;
+        int32 endY;
         Orientation orientation;
         TSet<Portal *> connected;
         FlowTile *parentTile;
 
-        Portal(int startX, int startY, int endX, int endY, Orientation orientation, FlowTile *parentTile);
+        Portal(int32 startX, int32 startY, int32 endX, int32 endY, Orientation orientation, FlowTile *parentTile);
     };
 }
 
