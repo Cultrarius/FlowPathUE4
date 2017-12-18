@@ -9,17 +9,29 @@
 using namespace std;
 using namespace flow;
 
-FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(tileData) {
+FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(tileData), fixedTileData(nullptr) {
+    initPortalData(tileLength);
+}
+
+flow::FlowTile::FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength) : fixedTileData(fixedTileData)
+{
+    initPortalData(tileLength);
+}
+
+void flow::FlowTile::initPortalData(int32 tileLength)
+{
+    const auto& data = fixedTileData == nullptr ? tileData : *fixedTileData;
     int32 maxIndex = tileLength - 1;
 
     //find left portals
     int32 start = -1;
     for (int32 i = 0; i < tileLength; i++) {
-        auto val = tileData[i * tileLength];
+        auto val = data[i * tileLength];
         if (start != -1 && val == BLOCKED) {
             portals.Emplace(0, start, 0, i - 1, LEFT, this);
             start = -1;
-        } else if (start == -1 && val != BLOCKED) {
+        }
+        else if (start == -1 && val != BLOCKED) {
             start = i;
         }
     }
@@ -30,11 +42,12 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
     //find right portals
     start = -1;
     for (int32 i = 0; i < tileLength; i++) {
-        auto val = tileData[i * tileLength + tileLength - 1];
+        auto val = data[i * tileLength + tileLength - 1];
         if (start != -1 && val == BLOCKED) {
             portals.Emplace(maxIndex, start, maxIndex, i - 1, RIGHT, this);
             start = -1;
-        } else if (start == -1 && val != BLOCKED) {
+        }
+        else if (start == -1 && val != BLOCKED) {
             start = i;
         }
     }
@@ -45,11 +58,12 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
     //find top portals
     start = -1;
     for (int32 i = 0; i < tileLength; i++) {
-        auto val = tileData[i];
+        auto val = data[i];
         if (start != -1 && val == BLOCKED) {
             portals.Emplace(start, 0, i - 1, 0, TOP, this);
             start = -1;
-        } else if (start == -1 && val != BLOCKED) {
+        }
+        else if (start == -1 && val != BLOCKED) {
             start = i;
         }
     }
@@ -60,11 +74,12 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
     //find bottom portals
     start = -1;
     for (int32 i = 0; i < tileLength; i++) {
-        auto val = tileData[i + tileLength * maxIndex];
+        auto val = data[i + tileLength * maxIndex];
         if (start != -1 && val == BLOCKED) {
             portals.Emplace(start, maxIndex, i - 1, maxIndex, BOTTOM, this);
             start = -1;
-        } else if (start == -1 && val != BLOCKED) {
+        }
+        else if (start == -1 && val != BLOCKED) {
             start = i;
         }
     }
@@ -74,7 +89,7 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
 
     // connect the portals via flood fill
     //TODO use more efficient algorithm, e.g. https://www.codeproject.com/Articles/6017/QuickFill-An-efficient-flood-fill-algorithm
-    TArray<BYTE> floodData = tileData;
+    TArray<BYTE> floodData = data;
     for (int32 y = 0; y < tileLength; y++) {
         for (int32 x = 0; x < tileLength; x++) {
             int32 index = x + y * tileLength;
@@ -95,7 +110,7 @@ FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(ti
                     int32 floodX = coord.X;
                     int32 floodY = coord.Y;
                     int32 floodIndex = floodX + floodY * tileLength;
-                    if (floodX < 0 ||  (floodX - tileLength) >= 0 || floodY < 0 || (floodY - tileLength) >= 0 ||
+                    if (floodX < 0 || (floodX - tileLength) >= 0 || floodY < 0 || (floodY - tileLength) >= 0 ||
                         floodData[floodIndex] == 0 || floodData[floodIndex] == BLOCKED) {
                         continue;
                     }

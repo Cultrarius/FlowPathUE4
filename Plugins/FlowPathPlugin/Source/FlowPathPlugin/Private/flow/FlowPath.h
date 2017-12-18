@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <memory>
 #include "FlowTile.h"
 
 namespace flow {
@@ -24,11 +23,12 @@ namespace flow {
 
     class FlowPath {
     private:
-        //TODO: use empty data instead of tile
-        std::unique_ptr<FlowTile> emptyTile;
+        TArray<BYTE> emptyTileData;
+        TArray<BYTE> fullTileData;
+
         int32 tileLength;
-        TMap<FIntPoint, FlowTile *> tileMap;
-        TMap<Agent *, std::unique_ptr<Agent>> agents;
+        TMap<FIntPoint, TUniquePtr<FlowTile>> tileMap;
+        TMap<Agent *, TUniquePtr<Agent>> agents;
 
         void updatePortals(FIntPoint tileCoordinates);
 
@@ -37,14 +37,12 @@ namespace flow {
     public:
         explicit FlowPath(int32 tileLength);
 
-        ~FlowPath();
-
         void updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileData);
 
         //TODO remove, debug only
         void printPortals() const;
 
-        void addAgent(std::unique_ptr<Agent> agent);
+        void addAgent(TUniquePtr<Agent> agent);
 
         void killAgent(Agent *agent);
 

@@ -10,11 +10,12 @@ using namespace flow;
 
 FlowPath::FlowPath(int32 tileLength) : tileLength(tileLength) {
     int32 size = tileLength * tileLength;
-    TArray<BYTE> mapData;
+    emptyTileData.AddUninitialized(size);
+    fullTileData.AddUninitialized(size);
     for (int32 i = 0; i < size; i++) {
-        mapData[i] = 1;
+        emptyTileData[i] = EMPTY;
+        fullTileData[i] = BLOCKED;
     }
-    emptyTile = unique_ptr<FlowTile>(new FlowTile(mapData, tileLength));
 }
 
 void FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileData) {
@@ -22,29 +23,40 @@ void FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileD
         throw runtime_error("Invalid tile size");
     }
     bool isEmpty = true;
+    bool isBlocked = true;
     for (int32 i = 0; i < tileLength * tileLength; i++) {
         if (tileData[i] == 0) {
             throw runtime_error("Invalid tile value: 0");
         }
-        if (tileData[i] != 1) {
+        if (tileData[i] != EMPTY) {
             isEmpty = false;
-            break;
+        }
+        if (tileData[i] != BLOCKED) {
+            isBlocked = false;
         }
     }
-
-    FlowTile *tile = isEmpty ? emptyTile.get() : new FlowTile(tileData, tileLength);
+    FlowTile *tile;
+    if (isEmpty) {
+        tile = new FlowTile(&emptyTileData, tileLength);
+    }
+    else if (isBlocked) {
+        tile = new FlowTile(&fullTileData, tileLength);
+    }
+    else {
+        tile = new FlowTile(tileData, tileLength);
+    }
     FIntPoint coord(tileX, tileY);
     auto existingTile = tileMap.Find(coord);
     if (existingTile != nullptr) {
-        delete *existingTile;
+        //TODO: cleanup connected portals
         tileMap.Remove(coord);
     }
-    tileMap.Add(coord, tile);
+    tileMap.Add(coord, TUniquePtr<FlowTile>(tile));
     updatePortals(coord);
 }
 
-void FlowPath::addAgent(unique_ptr<Agent> agent) {
-    agents.Emplace(agent.get(), move(agent));
+void FlowPath::addAgent(TUniquePtr<Agent> agent) {
+    agents.Emplace(agent.Get(), move(agent));
 }
 
 void FlowPath::killAgent(Agent *agent) {
@@ -85,27 +97,19 @@ void FlowPath::updatePortals(FIntPoint tileCoordinates) {
     }
 }
 
-FlowPath::~FlowPath() {
-    for (auto mapPair : tileMap) {
-        if (mapPair.Value != emptyTile.get()) {
-            delete mapPair.Value;
-        }
-    }
-}
-
 FlowTile *FlowPath::getTile(FIntPoint tileCoordinates) {
     auto tile = tileMap.Find(tileCoordinates);
-    return tile == nullptr ? nullptr : *tile;
+    return tile == nullptr ? nullptr : tile->Get();
 }
 
 void FlowPath::printPortals() const {
     for (auto& tilePair : tileMap) {
-        cout << tilePair.Key.X << ", " << tilePair.Key.Y << ": \n";
+        UE_LOG(LogExec, Warning, TEXT("Tile %d, %d:"), tilePair.Key.X, tilePair.Key.Y);
         for (auto& portal : tilePair.Value->portals) {
             for (auto& connected : portal.connected) {
                 if (connected->parentTile != portal.parentTile) {
-                    cout << "  (" << portal.startX << ", " << portal.startY << " - " << portal.endX << ", " << portal.endY << ") -> ("
-                            << connected->startX << ", " << connected->startY << " - " << connected->endX << ", " << connected->endY << ")\n";
+                    UE_LOG(LogExec, Warning, TEXT("  From (%d, %d -> %d, %d) To (%d, %d -> %d, %d)"), portal.startX, portal.startY, portal.endX, portal.endY,
+                        connected->startX, connected->startY,  connected->endX, connected->endY);
                 }
             }
         }
