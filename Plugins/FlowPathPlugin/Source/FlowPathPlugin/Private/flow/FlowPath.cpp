@@ -35,17 +35,18 @@ void FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileD
             isBlocked = false;
         }
     }
+
+    FIntPoint coord(tileX, tileY);
     FlowTile *tile;
     if (isEmpty) {
-        tile = new FlowTile(&emptyTileData, tileLength);
+        tile = new FlowTile(&emptyTileData, tileLength, coord);
     }
     else if (isBlocked) {
-        tile = new FlowTile(&fullTileData, tileLength);
+        tile = new FlowTile(&fullTileData, tileLength, coord);
     }
     else {
-        tile = new FlowTile(tileData, tileLength);
+        tile = new FlowTile(tileData, tileLength, coord);
     }
-    FIntPoint coord(tileX, tileY);
     auto existingTile = tileMap.Find(coord);
     if (existingTile != nullptr) {
         //TODO: cleanup connected portals

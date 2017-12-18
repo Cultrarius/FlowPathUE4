@@ -12,15 +12,19 @@ namespace flow {
     private:
         TArray<BYTE> tileData;
         TArray<BYTE>* fixedTileData;
+        FIntPoint coordinates;
 
         void initPortalData(int32 tileLength);
 
     public:
+        //TODO: make private, is only public for debug
         TArray<Portal> portals;
 
-        explicit FlowTile(const TArray<BYTE> &tileData, int32 tileLength);
+        const FIntPoint& getCoordinates() const;
 
-        explicit FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength);
+        explicit FlowTile(const TArray<BYTE> &tileData, int32 tileLength, FIntPoint coordinates);
+
+        explicit FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength, FIntPoint coordinates);
 
         TArray<int32> getPortalsIndicesFor(int32 x, int32 y) const;
 

@@ -9,11 +9,16 @@
 using namespace std;
 using namespace flow;
 
-FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength) : tileData(tileData), fixedTileData(nullptr) {
+const FIntPoint & flow::FlowTile::getCoordinates() const
+{
+    return coordinates;
+}
+
+FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength, FIntPoint coordinates) : tileData(tileData), fixedTileData(nullptr), coordinates(coordinates) {
     initPortalData(tileLength);
 }
 
-flow::FlowTile::FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength) : fixedTileData(fixedTileData)
+flow::FlowTile::FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength, FIntPoint coordinates) : fixedTileData(fixedTileData), coordinates(coordinates)
 {
     initPortalData(tileLength);
 }
