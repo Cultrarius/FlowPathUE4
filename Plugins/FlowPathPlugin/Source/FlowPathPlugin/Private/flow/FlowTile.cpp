@@ -9,6 +9,11 @@
 using namespace std;
 using namespace flow;
 
+const TArray<Portal>& flow::FlowTile::getPortals() const
+{
+    return portals;
+}
+
 const FIntPoint & flow::FlowTile::getCoordinates() const
 {
     return coordinates;
@@ -136,9 +141,7 @@ void flow::FlowTile::initPortalData()
                         if (i == k || portal->connected.Contains(otherPortal)) { 
                             continue; 
                         }
-                        FIntPoint start((portal->startX + portal->endX) / 2, (portal->startY + portal->endY) / 2);
-                        FIntPoint end((otherPortal->startX + otherPortal->endX) / 2, (otherPortal->startY + otherPortal->endY) / 2);
-                        auto portalPath = findPath(start, end);
+                        auto portalPath = findPath(portal->center, otherPortal->center);
                         if (!portalPath.success) {
                             continue;
                         }
@@ -151,13 +154,10 @@ void flow::FlowTile::initPortalData()
     }
 }
 
-float flow::FlowTile::distance(FIntPoint p1, FIntPoint p2)
-{
-    return FMath::Sqrt((p2 - p1).SizeSquared());
-}
-
 int32 flow::FlowTile::fastDistance(FIntPoint p1, FIntPoint p2)
 {
+    // this is more than the actual distance, but we only need it for the A* heuristic
+    // and this way we don't need to calculate the square root
     return FMath::Abs(p2.X - p1.X) + FMath::Abs(p2.Y - p1.Y);
 }
 
@@ -175,7 +175,7 @@ TArray<int32> FlowTile::getPortalsIndicesFor(int32 x, int32 y) const {
     TArray<int32> result;
     for (int32 i = 0; i < portals.Num(); i++) {
         const Portal &portal = portals[i];
-        if (portal.startX <= x && portal.endX >= x && portal.startY <= y && portal.endY >= y) {
+        if (portal.start.X <= x && portal.end.X >= x && portal.start.Y <= y && portal.end.Y >= y) {
             result.Add(i);
         }
     }
@@ -195,10 +195,10 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
                 continue;
             }
 
-            int32 startX = max(otherPortal.startX, thisPortal.startX);
-            int32 startY = max(otherPortal.startY, thisPortal.startY);
-            int32 endX = min(otherPortal.endX, thisPortal.endX);
-            int32 endY = min(otherPortal.endY, thisPortal.endY);
+            int32 startX = max(otherPortal.start.X, thisPortal.start.X);
+            int32 startY = max(otherPortal.start.Y, thisPortal.start.Y);
+            int32 endX = min(otherPortal.end.X, thisPortal.end.X);
+            int32 endY = min(otherPortal.end.Y, thisPortal.end.Y);
             if (((side == TOP || side == BOTTOM) && startX <= endX) ||
                 ((side == LEFT || side == RIGHT) && startY <= endY)) {
                 //TODO we insert a default value of 1 here, which is technically not correct, but we are also lazy
@@ -228,11 +228,11 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
 {
     TArray<FIntPoint> wayPoints;
     if (start == end) {
-        return { false, wayPoints, 0, 0 };
+        return { true, wayPoints, 0 };
     }
 
     // do an improved A* search with waypoint smoothing
-    // inspired by https://www.gamasutra.com/view/feature/131505/toward_more_realistic_pathfinding.php?page=1
+    // inspired by https://www.gamasutra.com/view/feature/131505/toward_more_realistic_pathfinding.php
 
     int32 tileSize = tileLength * tileLength;
     TArray<bool> initializedTiles;
@@ -268,24 +268,21 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         //UE_LOG(LogExec, Warning, TEXT("New frontier %d, %d"), frontier.X, frontier.Y);
 
         if (frontierCost == -1) {
-            return{ false, wayPoints, 0, 0 };
+            return{ false, wayPoints, 0 };
         }
     } while (frontier != end);
 
-    // TODO maybe add path smoothing
+    // TODO maybe add path smoothing?
     int32 pathCost = 0;
-    float pathLength = 0;
     while (frontier != start) {
         wayPoints.Add(frontier);
         int32 tileIndex = toIndex(frontier);
         pathCost += getData()[tileIndex];
-        auto& parent = tiles[tileIndex].parentTile;
-        pathLength += frontier.X == parent.X ? 1 : 1.4f;
-        frontier = parent;
+        frontier = tiles[tileIndex].parentTile;
     }
     wayPoints.Add(start);
     
-    return{ true, wayPoints, pathCost, pathLength };
+    return{ true, wayPoints, pathCost };
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const

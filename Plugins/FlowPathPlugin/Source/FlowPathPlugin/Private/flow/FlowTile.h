@@ -14,9 +14,8 @@ namespace flow {
     };
 
     struct AStarTile {
-        // TODO maybe use int32 instead of float
-        float pointCost;
-        float goalCost;
+        int32 pointCost;
+        int32 goalCost;
         FIntPoint location;
         FIntPoint parentTile;
         FIntPoint nextOpen;
@@ -28,7 +27,6 @@ namespace flow {
         bool success;
         TArray<FIntPoint> waypoints;
         int32 pathCost;
-        float pathLength;
     };
 
     class FlowTile {
@@ -37,10 +35,9 @@ namespace flow {
         TArray<BYTE>* fixedTileData;
         FIntPoint coordinates;
         int32 tileLength;
+        TArray<Portal> portals;
 
         void initPortalData();
-
-        static float distance(FIntPoint p1, FIntPoint p2);
 
         static int32 fastDistance(FIntPoint p1, FIntPoint p2);
 
@@ -57,8 +54,8 @@ namespace flow {
         bool isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const;
 
     public:
-        //TODO: make private, is only public for debug
-        TArray<Portal> portals;
+
+        const TArray<Portal>& getPortals() const;
 
         const FIntPoint& getCoordinates() const;
 

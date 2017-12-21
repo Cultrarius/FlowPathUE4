@@ -21,6 +21,30 @@ namespace flow {
         FVector2D target;
     };
 
+    struct PortalSearchNode {
+        int32 nodeCost;
+        int32 goalCost;
+        const Portal* nodePortal;
+        const Portal* parentPortal;
+        bool open;
+
+        bool operator<(const PortalSearchNode& other) const
+        {
+            return goalCost < other.goalCost;
+        }
+    };
+
+    struct PortalSearchResult {
+        bool success;
+        TArray<const Portal*> waypoints;
+        int32 pathCost;
+    };
+
+    struct TilePoint {
+        FIntPoint tileLocation;
+        FIntPoint pointInTile;
+    };
+
     class FlowPath {
     private:
         TArray<BYTE> emptyTileData;
@@ -34,6 +58,10 @@ namespace flow {
         void updatePortals(FIntPoint tileCoordinates);
 
         FlowTile *getTile(FIntPoint tileCoordinates);
+
+        bool isValidTileLocation(const FIntPoint& p) const;
+
+        int32 calcGoalHeuristic(Orientation startOrientation, const FlowTile& fromTile, const FlowTile& toTile) const;
 
     public:
         explicit FlowPath(int32 tileLength, bool allowCrossGridMovement);
@@ -50,5 +78,7 @@ namespace flow {
         void updateAgents();
 
         PathSearchResult findDirectPath(FIntPoint start, FIntPoint end);
+
+        PortalSearchResult findPortalPath(TilePoint start, TilePoint end);
     };
 }
