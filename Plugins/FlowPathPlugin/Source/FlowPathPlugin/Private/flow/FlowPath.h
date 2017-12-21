@@ -27,6 +27,7 @@ namespace flow {
         TArray<BYTE> fullTileData;
 
         int32 tileLength;
+        bool allowCrossGridMovement;
         TMap<FIntPoint, TUniquePtr<FlowTile>> tileMap;
         TMap<Agent *, TUniquePtr<Agent>> agents;
 
@@ -35,7 +36,7 @@ namespace flow {
         FlowTile *getTile(FIntPoint tileCoordinates);
 
     public:
-        explicit FlowPath(int32 tileLength);
+        explicit FlowPath(int32 tileLength, bool allowCrossGridMovement);
 
         void updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileData);
 
@@ -47,5 +48,7 @@ namespace flow {
         void killAgent(Agent *agent);
 
         void updateAgents();
+
+        TArray<FIntPoint> findDirectPath(FIntPoint start, FIntPoint end, bool crossGridMovement);
     };
 }

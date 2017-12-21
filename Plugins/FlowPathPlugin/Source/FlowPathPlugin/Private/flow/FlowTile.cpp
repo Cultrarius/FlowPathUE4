@@ -14,18 +14,18 @@ const FIntPoint & flow::FlowTile::getCoordinates() const
     return coordinates;
 }
 
-FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength, FIntPoint coordinates) : tileData(tileData), fixedTileData(nullptr), coordinates(coordinates) {
-    initPortalData(tileLength);
+FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength, FIntPoint coordinates) : tileData(tileData), fixedTileData(nullptr), coordinates(coordinates), tileLength(tileLength) {
+    initPortalData();
 }
 
-flow::FlowTile::FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength, FIntPoint coordinates) : fixedTileData(fixedTileData), coordinates(coordinates)
+flow::FlowTile::FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength, FIntPoint coordinates) : fixedTileData(fixedTileData), coordinates(coordinates), tileLength(tileLength)
 {
-    initPortalData(tileLength);
+    initPortalData();
 }
 
-void flow::FlowTile::initPortalData(int32 tileLength)
+void flow::FlowTile::initPortalData()
 {
-    const auto& data = fixedTileData == nullptr ? tileData : *fixedTileData;
+    auto& data = getData();
     int32 maxIndex = tileLength - 1;
 
     //find left portals
@@ -142,6 +142,26 @@ void flow::FlowTile::initPortalData(int32 tileLength)
     }
 }
 
+float flow::FlowTile::distance(FIntPoint p1, FIntPoint p2)
+{
+    return FMath::Sqrt((p2 - p1).SizeSquared());
+}
+
+int32 flow::FlowTile::fastDistance(FIntPoint p1, FIntPoint p2)
+{
+    return FMath::Abs(p2.X - p1.X) + FMath::Abs(p2.Y - p1.Y);
+}
+
+inline int32 flow::FlowTile::toIndex(int32 x, int32 y) const
+{
+    return x + y * tileLength;
+}
+
+inline int32 flow::FlowTile::toIndex(FIntPoint coordinates) const
+{
+    return coordinates.X + coordinates.Y * tileLength;
+}
+
 TArray<int32> FlowTile::getPortalsIndicesFor(int32 x, int32 y) const {
     TArray<int32> result;
     for (int32 i = 0; i < portals.Num(); i++) {
@@ -177,4 +197,145 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
             }
         }
     }
+}
+
+TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end, bool crossGridMovement)
+{
+    TArray<FIntPoint> wayPoints;
+    if (start == end) {
+        return wayPoints;
+    }
+
+    // do an improved A* search with waypoint smoothing
+    // inspired by https://www.gamasutra.com/view/feature/131505/toward_more_realistic_pathfinding.php?page=1
+
+    int32 tileSize = tileLength * tileLength;
+    TArray<bool> initializedTiles;
+    initializedTiles.AddZeroed(tileSize);
+    TArray<AStarTile> tiles;
+    tiles.AddUninitialized(tileSize);
+
+    int32 goalIndex = toIndex(end);
+    int32 startIndex = toIndex(start);
+    
+    tiles[startIndex].pointCost = 0;
+    initializedTiles[startIndex] = true;
+    tiles[startIndex].location = start;
+    tiles[startIndex].goalCost = fastDistance(start, end);
+    tiles[startIndex].open = false;
+
+    FIntPoint frontier = start;
+    do {
+        initializeFrontier(frontier, initializedTiles, tiles, end);
+        int32 frontierCost = -1;
+        for (int y = 0; y < tileLength; y++) {
+            for (int x = 0; x < tileLength; x++) {
+                int32 i = toIndex(x, y);
+                if (initializedTiles[i] && tiles[i].open && (frontierCost < 0 || frontierCost > tiles[i].goalCost)) {
+                    frontier.X = x;
+                    frontier.Y = y;
+                    frontierCost = tiles[i].goalCost;
+                }
+            }
+        }
+    } while (frontier != end);
+
+    while (frontier != start) {
+        wayPoints.Add(frontier);
+        frontier = tiles[toIndex(frontier)].parentTile;
+    }
+    wayPoints.Add(start);
+    
+    return wayPoints;
+}
+
+#include <assert.h>
+
+void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>& initializedTiles, TArray<AStarTile>& tiles, const FIntPoint & goal) const
+{
+    int32 frontierIndex = toIndex(frontier);
+    tiles[frontierIndex].open = false;
+    assert(initializedTiles[frontierIndex]);
+
+    // init north tile
+    if (frontier.Y > 0) {
+        FIntPoint tile = frontier + FIntPoint(0, -1);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+
+    // init north-west tile
+    if (frontier.Y > 0 && frontier.X > 0) {
+        FIntPoint tile = frontier + FIntPoint(-1, -1);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+
+    // init west tile
+    if (frontier.X > 0) {
+        FIntPoint tile = frontier + FIntPoint(-1, 0);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+
+    // init south-west tile
+    if (frontier.X > 0 && frontier.Y < (tileLength - 1)) {
+        FIntPoint tile = frontier + FIntPoint(-1, 1);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+
+    // init south tile
+    if (frontier.Y < (tileLength - 1)) {
+        FIntPoint tile = frontier + FIntPoint(0, 1);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+
+    // init south-east tile
+    if (frontier.Y < (tileLength - 1) && frontier.X < (tileLength - 1)) {
+        FIntPoint tile = frontier + FIntPoint(1, 1);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+
+    // init east tile
+    if (frontier.X < (tileLength - 1)) {
+        FIntPoint tile = frontier + FIntPoint(1, 0);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+
+    // init north-east tile
+    if (frontier.X < (tileLength - 1) && frontier.Y > 0) {
+        FIntPoint tile = frontier + FIntPoint(1, -1);
+        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+    }
+}
+
+void flow::FlowTile::initFrontierTile(const FIntPoint& tile, TArray<bool> &initializedTiles, TArray<AStarTile> &tiles, int32 frontierIndex, const FIntPoint & goal, const FIntPoint& frontier) const
+{
+    auto& data = getData();
+    int32 tileIndex = toIndex(tile);
+    int32 pointCost = tiles[frontierIndex].pointCost + data[tileIndex];
+    int32 goalCost = pointCost + fastDistance(tile, goal);
+    if (!initializedTiles[tileIndex]) {
+        initializedTiles[tileIndex] = true;
+        if (data[tileIndex] == BLOCKED) {
+            tiles[tileIndex].open = false;
+        }
+        else {
+            tiles[tileIndex].open = true;
+            tiles[tileIndex].location = tile;
+            tiles[tileIndex].pointCost = pointCost;
+            tiles[tileIndex].goalCost = goalCost;
+            tiles[tileIndex].parentTile = frontier;
+        }
+    }
+    else if (tiles[tileIndex].open && goalCost < tiles[tileIndex].goalCost) {
+        tiles[tileIndex].pointCost = pointCost;
+        tiles[tileIndex].goalCost = goalCost;
+        tiles[tileIndex].parentTile = frontier;
+    }
+}
+
+const TArray<BYTE>& flow::FlowTile::getData() const
+{
+    if (fixedTileData != nullptr) {
+        return *fixedTileData;
+    }
+    return tileData;
 }

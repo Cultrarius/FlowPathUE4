@@ -8,7 +8,7 @@
 using namespace std;
 using namespace flow;
 
-FlowPath::FlowPath(int32 tileLength) : tileLength(tileLength) {
+FlowPath::FlowPath(int32 tileLength, bool allowCrossGridMovement) : tileLength(tileLength), allowCrossGridMovement(allowCrossGridMovement) {
     int32 size = tileLength * tileLength;
     emptyTileData.AddUninitialized(size);
     fullTileData.AddUninitialized(size);
@@ -66,6 +66,11 @@ void FlowPath::killAgent(Agent *agent) {
 
 void FlowPath::updateAgents() {
 
+}
+
+TArray<FIntPoint> flow::FlowPath::findDirectPath(FIntPoint start, FIntPoint end, bool crossGridMovement)
+{
+    return (*tileMap.Find(FIntPoint(1, 1)))->findPath(start, end, crossGridMovement);
 }
 
 void FlowPath::updatePortals(FIntPoint tileCoordinates) {
