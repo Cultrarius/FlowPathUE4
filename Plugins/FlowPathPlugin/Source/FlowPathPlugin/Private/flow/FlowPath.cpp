@@ -49,7 +49,7 @@ void FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileD
     }
     auto existingTile = tileMap.Find(coord);
     if (existingTile != nullptr) {
-        //TODO: cleanup connected portals
+        (*existingTile)->removeConnectedPortals();
         tileMap.Remove(coord);
     }
     tileMap.Add(coord, TUniquePtr<FlowTile>(tile));
@@ -113,9 +113,9 @@ void FlowPath::printPortals() const {
         UE_LOG(LogExec, Warning, TEXT("Tile %d, %d:"), tilePair.Key.X, tilePair.Key.Y);
         for (auto& portal : tilePair.Value->portals) {
             for (auto& connected : portal.connected) {
-                if (connected->parentTile != portal.parentTile) {
+                if (connected.Key->parentTile != portal.parentTile) {
                     UE_LOG(LogExec, Warning, TEXT("  From (%d, %d -> %d, %d) To (%d, %d -> %d, %d)"), portal.startX, portal.startY, portal.endX, portal.endY,
-                        connected->startX, connected->startY,  connected->endX, connected->endY);
+                        connected.Key->startX, connected.Key->startY,  connected.Key->endX, connected.Key->endY);
                 }
             }
         }

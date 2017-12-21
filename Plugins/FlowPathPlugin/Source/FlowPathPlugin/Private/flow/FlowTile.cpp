@@ -129,13 +129,22 @@ void flow::FlowTile::initPortalData()
                     connected.Append(indices);
                 }
 
-                TArray<Portal *> connectedPortals;
-                for (int32 pIndex : connected) {
-                    connectedPortals.Add(&portals[pIndex]);
-                }
-                for (auto portal : connectedPortals) {
-                    portal->connected.Append(connectedPortals);
-                    portal->connected.Remove(portal);
+                for (int32 i : connected) {
+                    for (int32 k : connected) {
+                        auto portal = &portals[i];
+                        auto otherPortal = &portals[k];
+                        if (i == k || portal->connected.Contains(otherPortal)) { 
+                            continue; 
+                        }
+                        FIntPoint start((portal->startX + portal->endX) / 2, (portal->startY + portal->endY) / 2);
+                        FIntPoint end((otherPortal->startX + otherPortal->endX) / 2, (otherPortal->startY + otherPortal->endY) / 2);
+                        auto portalPath = findPath(start, end);
+                        if (!portalPath.success) {
+                            continue;
+                        }
+                        portal->connected.Add(otherPortal, portalPath.pathCost);
+                        otherPortal->connected.Add(portal, portalPath.pathCost);
+                    }
                 }
             }
         }
@@ -192,9 +201,25 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
             int32 endY = min(otherPortal.endY, thisPortal.endY);
             if (((side == TOP || side == BOTTOM) && startX <= endX) ||
                 ((side == LEFT || side == RIGHT) && startY <= endY)) {
-                otherPortal.connected.Add(&thisPortal);
-                thisPortal.connected.Add(&otherPortal);
+                //TODO we insert a default value of 1 here, which is technically not correct, but we are also lazy
+                otherPortal.connected.Add(&thisPortal, 1);
+                thisPortal.connected.Add(&otherPortal, 1);
             }
+        }
+    }
+}
+
+void flow::FlowTile::removeConnectedPortals()
+{
+    for (auto& portal : portals)
+    {
+        for (auto& pair : portal.connected)
+        {
+            auto other = pair.Key;
+            if (other->parentTile == this) {
+                continue;
+            }
+            other->connected.Remove(&portal);
         }
     }
 }
@@ -229,7 +254,7 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         initializeFrontier(frontier, initializedTiles, tiles, end);
         int32 frontierCost = -1;
 
-        // TODO maintain linked list for faster open search
+        // TODO maintain linked list for faster open node search
         for (int y = 0; y < tileLength; y++) {
             for (int x = 0; x < tileLength; x++) {
                 int32 i = toIndex(x, y);

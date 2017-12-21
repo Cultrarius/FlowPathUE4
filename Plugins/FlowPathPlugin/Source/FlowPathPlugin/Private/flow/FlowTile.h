@@ -70,6 +70,8 @@ namespace flow {
 
         void connectOverlappingPortals(FlowTile &tile, Orientation side);
 
+        void removeConnectedPortals();
+
         PathSearchResult findPath(FIntPoint start, FIntPoint end);
     };
 }
