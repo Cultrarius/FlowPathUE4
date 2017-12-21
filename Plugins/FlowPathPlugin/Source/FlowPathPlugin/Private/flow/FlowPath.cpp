@@ -172,9 +172,13 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
     searchedNodes.Add(&startPortal, startNode);
     PortalSearchNode frontier;
     while (searchQueue.Num() > 0) {
-        hops++;
         searchQueue.HeapPop(frontier, false);
         frontier.open = false;
+        if (searchedNodes.Contains(frontier.nodePortal)) {
+            // we have already searched this portal node
+            continue;
+        }
+        hops++;
         searchedNodes.Add(frontier.nodePortal, frontier);
         auto nP = frontier.nodePortal;
         UE_LOG(LogExec, Warning, TEXT("Frontier %d, %d on tile %d, %d, goalCost %d"), nP->center.X, nP->center.Y, nP->parentTile->getCoordinates().X, nP->parentTile->getCoordinates().Y, frontier.goalCost);
@@ -201,22 +205,9 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
             PathSearchResult searchResult = (*endTile)->findPath(frontierPortal->center, end.pointInTile);
             if (searchResult.success) {
                 int32 nodeCost = frontier.nodeCost + searchResult.pathCost;
-                if (queuedPortals.Contains(&endPortal)) {
-                    for (auto& node : searchQueue) {
-                        if (node.nodePortal == &endPortal && node.nodeCost > nodeCost) {
-                            node.nodeCost = nodeCost;
-                            node.goalCost = nodeCost;
-                            node.parentPortal = frontierPortal;
-                            searchQueue.Heapify();
-                            break;
-                        }
-                    }
-                }
-                else {
-                    PortalSearchNode endNode = { nodeCost, nodeCost, &endPortal, frontierPortal, true };
-                    searchQueue.HeapPush(endNode);
-                    queuedPortals.Add(&endPortal);
-                }
+                PortalSearchNode endNode = { nodeCost, nodeCost, &endPortal, frontierPortal, true };
+                searchQueue.HeapPush(endNode);
+                queuedPortals.Add(&endPortal);
             }
         }
 
@@ -226,25 +217,9 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
             int32 nodeCost = frontier.nodeCost + connected.Value;
             TilePoint portalPoint = { target->parentTile->getCoordinates(), target->center };
             int32 goalCost = nodeCost + calcGoalHeuristic(portalPoint, end);
-            if (target->center == FIntPoint(0, 1)) {
-                UE_LOG(LogExec, Warning, TEXT("  -> new cost %d, nodeCost %d, connectionCost %d"), goalCost, frontier.nodeCost, connected.Value);
-            }
-            if (queuedPortals.Contains(target)) {
-                for (auto& node : searchQueue) {
-                    if (node.open && node.nodePortal == target && node.goalCost > goalCost) {
-                        node.nodeCost = nodeCost;
-                        node.goalCost = goalCost;
-                        node.parentPortal = frontierPortal;
-                        searchQueue.Heapify();
-                        break;
-                    }
-                }
-            }
-            else {
-                PortalSearchNode newNode = { nodeCost, goalCost, target, frontierPortal, true };
-                searchQueue.HeapPush(newNode);
-                queuedPortals.Add(target);
-            }
+            PortalSearchNode newNode = { nodeCost, goalCost, target, frontierPortal, true };
+            searchQueue.HeapPush(newNode);
+            queuedPortals.Add(target);
         }
     }
 
