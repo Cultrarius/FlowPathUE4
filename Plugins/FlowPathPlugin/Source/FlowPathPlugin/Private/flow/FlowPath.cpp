@@ -68,7 +68,7 @@ void FlowPath::updateAgents() {
 
 }
 
-TArray<FIntPoint> flow::FlowPath::findDirectPath(FIntPoint start, FIntPoint end)
+PathSearchResult flow::FlowPath::findDirectPath(FIntPoint start, FIntPoint end)
 {
     return (*tileMap.Find(FIntPoint(1, 1)))->findPath(start, end);
 }

@@ -199,11 +199,11 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
     }
 }
 
-TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
+PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
 {
     TArray<FIntPoint> wayPoints;
     if (start == end) {
-        return wayPoints;
+        return { false, wayPoints, 0, 0 };
     }
 
     // do an improved A* search with waypoint smoothing
@@ -229,7 +229,7 @@ TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         initializeFrontier(frontier, initializedTiles, tiles, end);
         int32 frontierCost = -1;
 
-        // todo maintain linked list for faster open search
+        // TODO maintain linked list for faster open search
         for (int y = 0; y < tileLength; y++) {
             for (int x = 0; x < tileLength; x++) {
                 int32 i = toIndex(x, y);
@@ -240,15 +240,27 @@ TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
                 }
             }
         }
+        //UE_LOG(LogExec, Warning, TEXT("New frontier %d, %d"), frontier.X, frontier.Y);
+
+        if (frontierCost == -1) {
+            return{ false, wayPoints, 0, 0 };
+        }
     } while (frontier != end);
 
+    // TODO maybe add path smoothing
+    int32 pathCost = 0;
+    float pathLength = 0;
     while (frontier != start) {
         wayPoints.Add(frontier);
-        frontier = tiles[toIndex(frontier)].parentTile;
+        int32 tileIndex = toIndex(frontier);
+        pathCost += getData()[tileIndex];
+        auto& parent = tiles[tileIndex].parentTile;
+        pathLength += frontier.X == parent.X ? 1 : 1.4f;
+        frontier = parent;
     }
     wayPoints.Add(start);
     
-    return wayPoints;
+    return{ true, wayPoints, pathCost, pathLength };
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const

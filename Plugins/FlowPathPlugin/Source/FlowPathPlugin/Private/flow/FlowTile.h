@@ -24,6 +24,13 @@ namespace flow {
         bool open;
     };
 
+    struct PathSearchResult {
+        bool success;
+        TArray<FIntPoint> waypoints;
+        int32 pathCost;
+        float pathLength;
+    };
+
     class FlowTile {
     private:
         TArray<BYTE> tileData;
@@ -63,6 +70,6 @@ namespace flow {
 
         void connectOverlappingPortals(FlowTile &tile, Orientation side);
 
-        TArray<FIntPoint> findPath(FIntPoint start, FIntPoint end);
+        PathSearchResult findPath(FIntPoint start, FIntPoint end);
     };
 }

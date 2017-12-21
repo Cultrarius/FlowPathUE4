@@ -49,6 +49,6 @@ namespace flow {
 
         void updateAgents();
 
-        TArray<FIntPoint> findDirectPath(FIntPoint start, FIntPoint end);
+        PathSearchResult findDirectPath(FIntPoint start, FIntPoint end);
     };
 }
