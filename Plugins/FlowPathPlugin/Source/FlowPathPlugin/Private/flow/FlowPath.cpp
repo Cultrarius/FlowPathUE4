@@ -122,7 +122,7 @@ void FlowPath::printPortals() const {
     }
 }
 
-PortalSearchResult flow::FlowPath::findPortalPath(TilePoint start, TilePoint end)
+PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const TilePoint& end) const
 {
     TArray<const Portal*> waypoints;
     PortalSearchResult result = {false, waypoints, 0};
@@ -131,11 +131,13 @@ PortalSearchResult flow::FlowPath::findPortalPath(TilePoint start, TilePoint end
     FIntPoint startPoint = start.pointInTile;
     FIntPoint endPoint = end.pointInTile;
 
-    if (startTile == nullptr || endTile == nullptr || !isValidTileLocation(startPoint) || !isValidTileLocation(endPoint)) {
+    // sanity checks
+    if (startTile == nullptr || endTile == nullptr || !isValidTileLocation(startPoint) || !isValidTileLocation(endPoint) ||
+        (*startTile)->getData(startPoint) == BLOCKED || (*endTile)->getData(endPoint) == BLOCKED) {
         return result;
     }
 
-    // check if start and end are on the same tile
+    // check if maybe start and end are already on the same tile
     if (start.tileLocation == end.tileLocation) {
         PathSearchResult directPath = (*startTile)->findPath(start.pointInTile, end.pointInTile);
         if (directPath.success) {
@@ -145,7 +147,7 @@ PortalSearchResult flow::FlowPath::findPortalPath(TilePoint start, TilePoint end
         }
     }
 
-    // we construct two special portals so they can be inserted into the queue
+    // we construct two special portals so they can be inserted into the search queue nodes
     TArray<PortalSearchNode> searchQueue;
     Portal startPortal(startPoint, startPoint, TOP, startTile->Get());
     Portal endPortal(endPoint, endPoint, TOP, endTile->Get());
@@ -156,18 +158,21 @@ PortalSearchResult flow::FlowPath::findPortalPath(TilePoint start, TilePoint end
     for (auto& portal : (*startTile)->getPortals()) {
         PathSearchResult searchResult = (*startTile)->findPath(startPoint, portal.center);
         if (searchResult.success) {
-            UE_LOG(LogExec, Warning, TEXT("  Path to %d, %d costs %d"), portal.center.X, portal.center.Y, searchResult.pathCost);
-            int32 goalCost = searchResult.pathCost + calcGoalHeuristic(portal.orientation, **startTile, **endTile);
+            TilePoint portalPoint = {start.tileLocation, portal.center};
+            int32 goalCost = searchResult.pathCost + calcGoalHeuristic(portalPoint, end);
+            UE_LOG(LogExec, Warning, TEXT("  Path to %d, %d costs %d (%d to goal)"), portal.center.X, portal.center.Y, searchResult.pathCost, goalCost);
             PortalSearchNode newNode = {searchResult.pathCost, goalCost, &portal, &startPortal, true};
             searchQueue.HeapPush(newNode);
             queuedPortals.Add(&portal);
         }
     }
 
+    int32 hops = 0;
     TMap<const Portal*, PortalSearchNode> searchedNodes;
     searchedNodes.Add(&startPortal, startNode);
     PortalSearchNode frontier;
     while (searchQueue.Num() > 0) {
+        hops++;
         searchQueue.HeapPop(frontier, false);
         frontier.open = false;
         searchedNodes.Add(frontier.nodePortal, frontier);
@@ -179,13 +184,15 @@ PortalSearchResult flow::FlowPath::findPortalPath(TilePoint start, TilePoint end
             result.success = true;
             result.pathCost = frontier.nodeCost;
 
-            // create waypoints, don't the start and end since they are not real portals
+            // create waypoints from the portals jumped from start to end
             frontier = searchedNodes[frontier.parentPortal];
             while (frontier.nodePortal != &startPortal) {
                 waypoints.Add(frontier.nodePortal);
                 frontier = searchedNodes[frontier.parentPortal];
             }
             result.waypoints = waypoints;
+            UE_LOG(LogExec, Warning, TEXT("  -> %d hops"), hops);
+            break;
         }
 
         // if we are on the goal tile we try to reach the target point from the portal
@@ -200,6 +207,8 @@ PortalSearchResult flow::FlowPath::findPortalPath(TilePoint start, TilePoint end
                             node.nodeCost = nodeCost;
                             node.goalCost = nodeCost;
                             node.parentPortal = frontierPortal;
+                            searchQueue.Heapify();
+                            break;
                         }
                     }
                 }
@@ -215,13 +224,19 @@ PortalSearchResult flow::FlowPath::findPortalPath(TilePoint start, TilePoint end
         for (auto& connected : frontier.nodePortal->connected) {
             Portal* target = connected.Key;
             int32 nodeCost = frontier.nodeCost + connected.Value;
-            int32 goalCost = nodeCost + calcGoalHeuristic(target->orientation, *target->parentTile, **endTile);
+            TilePoint portalPoint = { target->parentTile->getCoordinates(), target->center };
+            int32 goalCost = nodeCost + calcGoalHeuristic(portalPoint, end);
+            if (target->center == FIntPoint(0, 1)) {
+                UE_LOG(LogExec, Warning, TEXT("  -> new cost %d, nodeCost %d, connectionCost %d"), goalCost, frontier.nodeCost, connected.Value);
+            }
             if (queuedPortals.Contains(target)) {
                 for (auto& node : searchQueue) {
                     if (node.open && node.nodePortal == target && node.goalCost > goalCost) {
                         node.nodeCost = nodeCost;
                         node.goalCost = goalCost;
                         node.parentPortal = frontierPortal;
+                        searchQueue.Heapify();
+                        break;
                     }
                 }
             }
@@ -241,43 +256,12 @@ bool flow::FlowPath::isValidTileLocation(const FIntPoint & p) const
     return p.X >= 0 && p.Y >= 0 && p.X < tileLength && p.Y < tileLength;
 }
 
-int32 flow::FlowPath::calcGoalHeuristic(Orientation startOrientation, const FlowTile & fromTile, const FlowTile & toTile) const
+int32 flow::FlowPath::calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const
 {
-    FIntPoint delta = toTile.getCoordinates() - fromTile.getCoordinates();
-    int32 jumpsX = FMath::Abs(delta.X);
-    int32 jumpsY = FMath::Abs(delta.Y);
-
-    if (delta.X > 0 && startOrientation == LEFT) {
-        jumpsX++;
-    }
-    else if (delta.X > 0 && startOrientation == RIGHT) {
-        jumpsX--;
-    }
-    else if (delta.X < 0 && startOrientation == RIGHT) {
-        jumpsX++;
-    }
-    else if (delta.X < 0 && startOrientation == LEFT) {
-        jumpsX--;
-    }
-    
-    if (delta.Y > 0 && startOrientation == BOTTOM) {
-        jumpsY++;
-    }
-    else if (delta.Y > 0 && startOrientation == TOP) {
-        jumpsY--;
-    }
-    else if (delta.Y < 0 && startOrientation == TOP) {
-        jumpsY++;
-    }
-    else if (delta.Y < 0 && startOrientation == BOTTOM) {
-        jumpsY--;
-    }
-
-    int32 result = FIntPoint(jumpsX * tileLength, jumpsY * tileLength).Size();
-    const char* orientStr = startOrientation == TOP ? "top" : (startOrientation == BOTTOM ? "bottom" : (startOrientation == RIGHT ? "right" : "left"));
-    UE_LOG(LogExec, Warning, TEXT("Heuristic for %d, %d (%s) -> %d, %d: %d, %d = %d"), 
-        fromTile.getCoordinates().X, fromTile.getCoordinates().Y, ANSI_TO_TCHAR(orientStr),
-        toTile.getCoordinates().X, toTile.getCoordinates().Y, jumpsX, jumpsY, result);
-    
-    return result;
+    // calculate the absolute distance between start and end across the tiles
+    int32 startX = start.tileLocation.X * tileLength + start.pointInTile.X;
+    int32 startY = start.tileLocation.Y * tileLength + start.pointInTile.Y;
+    int32 endX = end.tileLocation.X * tileLength + end.pointInTile.X;
+    int32 endY = end.tileLocation.Y * tileLength + end.pointInTile.Y;
+    return FIntPoint(endX - startX, endY - startY).Size();
 }

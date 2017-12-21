@@ -30,6 +30,9 @@ namespace flow {
 
         bool operator<(const PortalSearchNode& other) const
         {
+            if (goalCost == other.goalCost) {
+                return nodeCost > other.nodeCost;
+            }
             return goalCost < other.goalCost;
         }
     };
@@ -61,7 +64,7 @@ namespace flow {
 
         bool isValidTileLocation(const FIntPoint& p) const;
 
-        int32 calcGoalHeuristic(Orientation startOrientation, const FlowTile& fromTile, const FlowTile& toTile) const;
+        int32 calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const;
 
     public:
         explicit FlowPath(int32 tileLength, bool allowCrossGridMovement);
@@ -79,6 +82,6 @@ namespace flow {
 
         PathSearchResult findDirectPath(FIntPoint start, FIntPoint end);
 
-        PortalSearchResult findPortalPath(TilePoint start, TilePoint end);
+        PortalSearchResult findPortalPath(const TilePoint& start, const TilePoint& end) const;
     };
 }

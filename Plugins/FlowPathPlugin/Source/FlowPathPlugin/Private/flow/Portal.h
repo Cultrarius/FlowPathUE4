@@ -18,7 +18,7 @@ namespace flow {
         FIntPoint end;
         FIntPoint center;
         Orientation orientation;
-        TMap<Portal *, float> connected;
+        TMap<Portal *, int32> connected;
         FlowTile *parentTile;
 
         Portal(int32 startX, int32 startY, int32 endX, int32 endY, Orientation orientation, FlowTile *parentTile);

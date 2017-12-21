@@ -145,6 +145,9 @@ void flow::FlowTile::initPortalData()
                         if (!portalPath.success) {
                             continue;
                         }
+                        if (portalPath.pathCost == 0) {
+                            UE_LOG(LogExec, Warning, TEXT("  From %d, %d -> %d, %d"), portal->center.X, portal->center.Y, otherPortal->center.X, otherPortal->center.Y);
+                        }
                         portal->connected.Add(otherPortal, portalPath.pathCost);
                         otherPortal->connected.Add(portal, portalPath.pathCost);
                     }
@@ -154,11 +157,9 @@ void flow::FlowTile::initPortalData()
     }
 }
 
-int32 flow::FlowTile::fastDistance(FIntPoint p1, FIntPoint p2)
+int32 flow::FlowTile::distance(FIntPoint p1, FIntPoint p2)
 {
-    // this is more than the actual distance, but we only need it for the A* heuristic
-    // and this way we don't need to calculate the square root
-    return FMath::Abs(p2.X - p1.X) + FMath::Abs(p2.Y - p1.Y);
+    return (p2 - p1).Size();
 }
 
 inline int32 flow::FlowTile::toIndex(int32 x, int32 y) const
@@ -246,7 +247,7 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
     tiles[startIndex].pointCost = 0;
     initializedTiles[startIndex] = true;
     tiles[startIndex].location = start;
-    tiles[startIndex].goalCost = fastDistance(start, end);
+    tiles[startIndex].goalCost = distance(start, end);
     tiles[startIndex].open = false;
 
     FIntPoint frontier = start;
@@ -265,7 +266,6 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
                 }
             }
         }
-        //UE_LOG(LogExec, Warning, TEXT("New frontier %d, %d"), frontier.X, frontier.Y);
 
         if (frontierCost == -1) {
             return{ false, wayPoints, 0 };
@@ -273,7 +273,7 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
     } while (frontier != end);
 
     // TODO maybe add path smoothing?
-    int32 pathCost = 0;
+    int32 pathCost = getData(start);
     while (frontier != start) {
         wayPoints.Add(frontier);
         int32 tileIndex = toIndex(frontier);
@@ -368,7 +368,7 @@ void flow::FlowTile::initFrontierTile(const FIntPoint& tile, TArray<bool> &initi
     auto& data = getData();
     int32 tileIndex = toIndex(tile);
     int32 pointCost = tiles[frontierIndex].pointCost + data[tileIndex];
-    int32 goalCost = pointCost + fastDistance(tile, goal);
+    int32 goalCost = pointCost + distance(tile, goal);
     if (!initializedTiles[tileIndex]) {
         initializedTiles[tileIndex] = true;
         if (data[tileIndex] == BLOCKED) {
@@ -395,4 +395,9 @@ const TArray<BYTE>& flow::FlowTile::getData() const
         return *fixedTileData;
     }
     return tileData;
+}
+
+BYTE flow::FlowTile::getData(FIntPoint coordinates) const
+{
+    return getData()[toIndex(coordinates)];
 }
