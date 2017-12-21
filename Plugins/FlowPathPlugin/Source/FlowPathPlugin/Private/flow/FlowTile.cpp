@@ -199,7 +199,7 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
     }
 }
 
-TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end, bool crossGridMovement)
+TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
 {
     TArray<FIntPoint> wayPoints;
     if (start == end) {
@@ -228,6 +228,8 @@ TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end, bool 
     do {
         initializeFrontier(frontier, initializedTiles, tiles, end);
         int32 frontierCost = -1;
+
+        // todo maintain linked list for faster open search
         for (int y = 0; y < tileLength; y++) {
             for (int x = 0; x < tileLength; x++) {
                 int32 i = toIndex(x, y);
@@ -249,13 +251,26 @@ TArray<FIntPoint> flow::FlowTile::findPath(FIntPoint start, FIntPoint end, bool 
     return wayPoints;
 }
 
-#include <assert.h>
+bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const
+{
+    // we do not want to allow cross movements where two obstacles meet, because most likely a unit cannot move there.
+    // For example, the move here from start S to target T would not be allowed:
+    // . # . .
+    // . # T . 
+    // . S # #
+    // . . . . 
+    auto& data = getData();
+    int32 deltaX = to.X - from.X;
+    int32 deltaY = to.Y - from.Y;
+    int32 index1 = toIndex(from + FIntPoint(deltaX, 0));
+    int32 index2 = toIndex(from + FIntPoint(0, deltaY));
+    return data[index1] != BLOCKED || data[index2] != BLOCKED;
+}
 
 void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>& initializedTiles, TArray<AStarTile>& tiles, const FIntPoint & goal) const
 {
     int32 frontierIndex = toIndex(frontier);
     tiles[frontierIndex].open = false;
-    assert(initializedTiles[frontierIndex]);
 
     // init north tile
     if (frontier.Y > 0) {
@@ -266,7 +281,9 @@ void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>&
     // init north-west tile
     if (frontier.Y > 0 && frontier.X > 0) {
         FIntPoint tile = frontier + FIntPoint(-1, -1);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        if (isCrossMoveAllowed(tile, frontier)) {
+            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        }
     }
 
     // init west tile
@@ -278,7 +295,9 @@ void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>&
     // init south-west tile
     if (frontier.X > 0 && frontier.Y < (tileLength - 1)) {
         FIntPoint tile = frontier + FIntPoint(-1, 1);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        if (isCrossMoveAllowed(tile, frontier)) {
+            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        }
     }
 
     // init south tile
@@ -290,7 +309,9 @@ void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>&
     // init south-east tile
     if (frontier.Y < (tileLength - 1) && frontier.X < (tileLength - 1)) {
         FIntPoint tile = frontier + FIntPoint(1, 1);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        if (isCrossMoveAllowed(tile, frontier)) {
+            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        }
     }
 
     // init east tile
@@ -302,7 +323,9 @@ void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>&
     // init north-east tile
     if (frontier.X < (tileLength - 1) && frontier.Y > 0) {
         FIntPoint tile = frontier + FIntPoint(1, -1);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        if (isCrossMoveAllowed(tile, frontier)) {
+            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier);
+        }
     }
 }
 

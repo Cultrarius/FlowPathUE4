@@ -47,6 +47,8 @@ namespace flow {
 
         const TArray<BYTE>& getData() const;
 
+        bool isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const;
+
     public:
         //TODO: make private, is only public for debug
         TArray<Portal> portals;
@@ -61,6 +63,6 @@ namespace flow {
 
         void connectOverlappingPortals(FlowTile &tile, Orientation side);
 
-        TArray<FIntPoint> findPath(FIntPoint start, FIntPoint end, bool crossGridMovement);
+        TArray<FIntPoint> findPath(FIntPoint start, FIntPoint end);
     };
 }

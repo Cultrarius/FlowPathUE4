@@ -49,6 +49,6 @@ namespace flow {
 
         void updateAgents();
 
-        TArray<FIntPoint> findDirectPath(FIntPoint start, FIntPoint end, bool crossGridMovement);
+        TArray<FIntPoint> findDirectPath(FIntPoint start, FIntPoint end);
     };
 }
