@@ -8,7 +8,7 @@
 using namespace std;
 using namespace flow;
 
-FlowPath::FlowPath(int32 tileLength, bool allowCrossGridMovement) : tileLength(tileLength), allowCrossGridMovement(allowCrossGridMovement) {
+FlowPath::FlowPath(int32 tileLength) : tileLength(tileLength) {
     int32 size = tileLength * tileLength;
     emptyTileData.AddUninitialized(size);
     fullTileData.AddUninitialized(size);
@@ -18,15 +18,15 @@ FlowPath::FlowPath(int32 tileLength, bool allowCrossGridMovement) : tileLength(t
     }
 }
 
-void FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileData) {
+bool FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tileData) {
     if (tileData.Num() != tileLength * tileLength) {
-        throw runtime_error("Invalid tile size");
+        return false;
     }
     bool isEmpty = true;
     bool isBlocked = true;
     for (int32 i = 0; i < tileLength * tileLength; i++) {
         if (tileData[i] == 0) {
-            throw runtime_error("Invalid tile value: 0");
+            return false;
         }
         if (tileData[i] != EMPTY) {
             isEmpty = false;
@@ -54,6 +54,7 @@ void FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileD
     }
     tileMap.Add(coord, TUniquePtr<FlowTile>(tile));
     updatePortals(coord);
+    return true;
 }
 
 void FlowPath::addAgent(TUniquePtr<Agent> agent) {

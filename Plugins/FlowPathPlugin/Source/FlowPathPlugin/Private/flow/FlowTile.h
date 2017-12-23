@@ -31,8 +31,8 @@ namespace flow {
 
     class FlowTile {
     private:
-        TArray<BYTE> tileData;
-        TArray<BYTE>* fixedTileData;
+        TArray<uint8> tileData;
+        TArray<uint8>* fixedTileData;
         FIntPoint coordinates;
         int32 tileLength;
         TArray<Portal> portals;
@@ -57,13 +57,13 @@ namespace flow {
 
         const FIntPoint& getCoordinates() const;
 
-        const TArray<BYTE>& getData() const;
+        const TArray<uint8>& getData() const;
 
-        BYTE getData(FIntPoint coordinates) const;
+        uint8 getData(FIntPoint coordinates) const;
 
-        explicit FlowTile(const TArray<BYTE> &tileData, int32 tileLength, FIntPoint coordinates);
+        explicit FlowTile(const TArray<uint8> &tileData, int32 tileLength, FIntPoint coordinates);
 
-        explicit FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength, FIntPoint coordinates);
+        explicit FlowTile(TArray<uint8>* fixedTileData, int32 tileLength, FIntPoint coordinates);
 
         TArray<int32> getPortalsIndicesFor(int32 x, int32 y) const;
 

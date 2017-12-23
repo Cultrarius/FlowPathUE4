@@ -19,11 +19,11 @@ const FIntPoint & flow::FlowTile::getCoordinates() const
     return coordinates;
 }
 
-FlowTile::FlowTile(const TArray<BYTE> &tileData, int32 tileLength, FIntPoint coordinates) : tileData(tileData), fixedTileData(nullptr), coordinates(coordinates), tileLength(tileLength) {
+FlowTile::FlowTile(const TArray<uint8> &tileData, int32 tileLength, FIntPoint coordinates) : tileData(tileData), fixedTileData(nullptr), coordinates(coordinates), tileLength(tileLength) {
     initPortalData();
 }
 
-flow::FlowTile::FlowTile(TArray<BYTE>* fixedTileData, int32 tileLength, FIntPoint coordinates) : fixedTileData(fixedTileData), coordinates(coordinates), tileLength(tileLength)
+flow::FlowTile::FlowTile(TArray<uint8>* fixedTileData, int32 tileLength, FIntPoint coordinates) : fixedTileData(fixedTileData), coordinates(coordinates), tileLength(tileLength)
 {
     initPortalData();
 }
@@ -99,7 +99,7 @@ void flow::FlowTile::initPortalData()
 
     // connect the portals via flood fill
     //TODO use more efficient algorithm, e.g. https://www.codeproject.com/Articles/6017/QuickFill-An-efficient-flood-fill-algorithm
-    TArray<BYTE> floodData = data;
+    TArray<uint8> floodData = data;
     for (int32 y = 0; y < tileLength; y++) {
         for (int32 x = 0; x < tileLength; x++) {
             int32 index = x + y * tileLength;
@@ -389,7 +389,7 @@ void flow::FlowTile::initFrontierTile(const FIntPoint& tile, TArray<bool> &initi
     }
 }
 
-const TArray<BYTE>& flow::FlowTile::getData() const
+const TArray<uint8>& flow::FlowTile::getData() const
 {
     if (fixedTileData != nullptr) {
         return *fixedTileData;
@@ -397,7 +397,7 @@ const TArray<BYTE>& flow::FlowTile::getData() const
     return tileData;
 }
 
-BYTE flow::FlowTile::getData(FIntPoint coordinates) const
+uint8 flow::FlowTile::getData(FIntPoint coordinates) const
 {
     return getData()[toIndex(coordinates)];
 }

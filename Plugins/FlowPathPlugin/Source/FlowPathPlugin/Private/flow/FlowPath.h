@@ -8,8 +8,8 @@
 
 namespace flow {
     
-    const BYTE EMPTY = 1;
-    const BYTE BLOCKED = 255;
+    const uint8 EMPTY = 1;
+    const uint8 BLOCKED = 255;
 
     struct Agent {
         FVector2D acceleration;
@@ -50,11 +50,10 @@ namespace flow {
 
     class FlowPath {
     private:
-        TArray<BYTE> emptyTileData;
-        TArray<BYTE> fullTileData;
+        TArray<uint8> emptyTileData;
+        TArray<uint8> fullTileData;
 
         int32 tileLength;
-        bool allowCrossGridMovement;
         TMap<FIntPoint, TUniquePtr<FlowTile>> tileMap;
         TMap<Agent *, TUniquePtr<Agent>> agents;
 
@@ -67,9 +66,9 @@ namespace flow {
         int32 calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const;
 
     public:
-        explicit FlowPath(int32 tileLength, bool allowCrossGridMovement);
+        explicit FlowPath(int32 tileLength);
 
-        void updateMapTile(int32 tileX, int32 tileY, const TArray<BYTE> &tileData);
+        bool updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tileData);
 
         //TODO remove, debug only
         void printPortals() const;
