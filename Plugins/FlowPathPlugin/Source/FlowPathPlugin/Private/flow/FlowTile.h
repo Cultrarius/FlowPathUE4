@@ -41,10 +41,6 @@ namespace flow {
 
         static int32 distance(FIntPoint p1, FIntPoint p2);
 
-        inline int32 toIndex(int32 x, int32 y) const;
-
-        inline int32 toIndex(FIntPoint coordinates) const;
-
         void initializeFrontier(const FIntPoint& frontier, TArray<bool>& initializedTiles, TArray<AStarTile>& tiles, const FIntPoint& goal) const;
 
         void initFrontierTile(const FIntPoint& tile, TArray<bool> &initializedTiles, TArray<AStarTile> &tiles, int32 frontierIndex, const FIntPoint & goal, const FIntPoint& frontier) const;
@@ -52,6 +48,10 @@ namespace flow {
         bool isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const;
 
     public:
+
+        int32 toIndex(int32 x, int32 y) const;
+
+        int32 toIndex(const FIntPoint& coordinates) const;
 
         const TArray<Portal>& getPortals() const;
 

@@ -69,6 +69,17 @@ void FlowPath::updateAgents() {
 
 }
 
+uint8 flow::FlowPath::getDataFor(const TilePoint & p) const
+{
+    auto tile = tileMap.Find(p.tileLocation);
+    if (tile == nullptr || !isValidTileLocation(p.pointInTile)) {
+        return BLOCKED;
+    }
+    
+    int32 index = (*tile)->toIndex(p.pointInTile);
+    return (*tile)->getData()[index];
+}
+
 PathSearchResult flow::FlowPath::findDirectPath(FIntPoint start, FIntPoint end)
 {
     return (*tileMap.Find(FIntPoint(1, 1)))->findPath(start, end);
@@ -107,20 +118,6 @@ void FlowPath::updatePortals(FIntPoint tileCoordinates) {
 FlowTile *FlowPath::getTile(FIntPoint tileCoordinates) {
     auto tile = tileMap.Find(tileCoordinates);
     return tile == nullptr ? nullptr : tile->Get();
-}
-
-void FlowPath::printPortals() const {
-    for (auto& tilePair : tileMap) {
-        UE_LOG(LogExec, Warning, TEXT("Tile %d, %d:"), tilePair.Key.X, tilePair.Key.Y);
-        for (auto& portal : tilePair.Value->getPortals()) {
-            for (auto& connected : portal.connected) {
-                if (connected.Key->parentTile != portal.parentTile) {
-                    UE_LOG(LogExec, Warning, TEXT("  From (%d, %d -> %d, %d) To (%d, %d -> %d, %d)"), portal.start.X, portal.start.Y, portal.end.X, portal.end.Y,
-                        connected.Key->start.X, connected.Key->start.Y, connected.Key->end.X, connected.Key->end.Y);
-                }
-            }
-        }
-    }
 }
 
 PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const TilePoint& end) const
@@ -221,6 +218,28 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
             PortalSearchNode newNode = { nodeCost, goalCost, target, frontierPortal, true };
             searchQueue.HeapPush(newNode);
             queuedPortals.Add(target);
+        }
+    }
+
+    return result;
+}
+
+TArray<FIntPoint> flow::FlowPath::getAllValidTileCoordinates() const
+{
+    TArray<FIntPoint> result;
+    for (auto& pair : tileMap) {
+        result.Add(pair.Key);
+    }
+    return result;
+}
+
+TArray<const Portal*> flow::FlowPath::getAllPortals() const
+{
+    TArray<const Portal*> result;
+
+    for (auto& tilePair : tileMap) {
+        for (auto& portal : tilePair.Value->getPortals()) {
+            result.Add(&portal);
         }
     }
 

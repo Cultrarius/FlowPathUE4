@@ -57,5 +57,17 @@ public:
     bool UpdateMapTilesFromTexture(int32 tileXUpperLeft, int32 tileYUpperLeft, UTexture2D* texture);
 
     UFUNCTION(BlueprintCallable, Category = "FlowPath")
-    void DebugPrintPortals();
+    uint8 GetTileDataForWorldPosition(FVector worldPosition);
+
+
+#if WITH_EDITOR
+
+    UFUNCTION(BlueprintCallable, Category = "FlowPath")
+    void DebugDrawAllBlockedCells();
+
+    UFUNCTION(BlueprintCallable, Category = "FlowPath")
+     void DebugDrawAllPortals();
+
+#endif		// WITH_EDITOR
+
 };

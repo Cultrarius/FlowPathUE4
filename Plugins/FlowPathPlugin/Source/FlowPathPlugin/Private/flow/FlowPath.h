@@ -70,17 +70,20 @@ namespace flow {
 
         bool updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tileData);
 
-        //TODO remove, debug only
-        void printPortals() const;
-
         void addAgent(TUniquePtr<Agent> agent);
 
         void killAgent(Agent *agent);
 
         void updateAgents();
 
+        uint8 getDataFor(const TilePoint& p) const;
+
         PathSearchResult findDirectPath(FIntPoint start, FIntPoint end);
 
         PortalSearchResult findPortalPath(const TilePoint& start, const TilePoint& end) const;
+
+        TArray<FIntPoint> getAllValidTileCoordinates() const;
+
+        TArray<const Portal*> getAllPortals() const;
     };
 }

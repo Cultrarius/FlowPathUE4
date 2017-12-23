@@ -29,7 +29,7 @@ void UFlowPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
         return;
     }
 
-    UpdatedPawn->AddMovementInput(FVector(1, 0, 0));
+    UpdatedPawn->AddMovementInput(FVector(0, 0, 0));
 }
 
 void UFlowPathComponent::RegisterComponentTickFunctions(bool bRegister)

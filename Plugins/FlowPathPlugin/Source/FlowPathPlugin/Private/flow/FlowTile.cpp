@@ -162,12 +162,12 @@ int32 flow::FlowTile::distance(FIntPoint p1, FIntPoint p2)
     return (p2 - p1).Size();
 }
 
-inline int32 flow::FlowTile::toIndex(int32 x, int32 y) const
+int32 flow::FlowTile::toIndex(int32 x, int32 y) const
 {
     return x + y * tileLength;
 }
 
-inline int32 flow::FlowTile::toIndex(FIntPoint coordinates) const
+int32 flow::FlowTile::toIndex(const FIntPoint& coordinates) const
 {
     return coordinates.X + coordinates.Y * tileLength;
 }
