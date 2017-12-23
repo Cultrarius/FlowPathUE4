@@ -3,7 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Navigation/PathFollowingComponent.h"
+#include "FlowPathManager.h"
+#include "Components/ActorComponent.h"
 #include "FlowPathComponent.generated.h"
 
 /**
@@ -18,6 +19,10 @@ class FLOWPATHPLUGIN_API UFlowPathComponent : public UActorComponent
 public:
 
     UFlowPathComponent();
+
+    /** If true, skips TickComponent() if UpdatedComponent was not recently rendered. */
+    UPROPERTY(BlueprintReadOnly, Transient, DuplicateTransient, Category = SteeringComponent)
+    AFlowPathManager* FlowPathManager;
 
     /**
     * The pawn we move and update.
@@ -53,7 +58,6 @@ public:
 
     /**
     * Possibly skip update if moved component is not rendered or can't move.
-    * @param DeltaTime @todo this parameter is not used in the function.
     * @return true if component movement update should be skipped
     */
     virtual bool ShouldSkipUpdate() const;
@@ -62,5 +66,7 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Components|Steering")
     virtual void SetUpdatedPawn(APawn* NewUpdatedPawn);
 
-
+    /** Assign the flow path manager which has the path steering info. */
+    UFUNCTION(BlueprintCallable, Category = "Components|Steering")
+    virtual void SetFlowPathManager(AFlowPathManager* NewFlowPathManager);
 };

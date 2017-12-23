@@ -19,12 +19,12 @@ void UFlowPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    // Don't hang on to stale references to a destroyed UpdatedPawn.
-    if (UpdatedPawn == nullptr)
+    if (ShouldSkipUpdate())
     {
         return;
     }
     if (UpdatedPawn->IsPendingKill()) {
+        // Don't hang on to stale references to a destroyed UpdatedPawn.
         SetUpdatedPawn(nullptr);
         return;
     }
@@ -138,4 +138,10 @@ void UFlowPathComponent::SetUpdatedPawn(APawn * NewUpdatedPawn)
 {
     // Don't assign pending kill components, but allow those to null out previous UpdatedComponent.
     UpdatedPawn = IsValid(NewUpdatedPawn) ? NewUpdatedPawn : NULL;
+}
+
+void UFlowPathComponent::SetFlowPathManager(AFlowPathManager * NewFlowPathManager)
+{
+    // Don't assign pending kill components, but allow those to null out previous UpdatedComponent.
+    FlowPathManager = IsValid(NewFlowPathManager) ? NewFlowPathManager : NULL;
 }
