@@ -102,16 +102,16 @@ void FlowPath::updatePortals(FIntPoint tileCoordinates) {
     FlowTile *bottomTile = getTile(bottom);
 
     if (leftTile != nullptr) {
-        tile->connectOverlappingPortals(*leftTile, LEFT);
+        tile->connectOverlappingPortals(*leftTile, Orientation::LEFT);
     }
     if (rightTile != nullptr) {
-        tile->connectOverlappingPortals(*rightTile, RIGHT);
+        tile->connectOverlappingPortals(*rightTile, Orientation::RIGHT);
     }
     if (topTile != nullptr) {
-        tile->connectOverlappingPortals(*topTile, TOP);
+        tile->connectOverlappingPortals(*topTile, Orientation::TOP);
     }
     if (bottomTile != nullptr) {
-        tile->connectOverlappingPortals(*bottomTile, BOTTOM);
+        tile->connectOverlappingPortals(*bottomTile, Orientation::BOTTOM);
     }
 }
 
@@ -147,8 +147,8 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
 
     // we construct two special portals so they can be inserted into the search queue nodes
     TArray<PortalSearchNode> searchQueue;
-    Portal startPortal(startPoint, startPoint, TOP, startTile->Get());
-    Portal endPortal(endPoint, endPoint, TOP, endTile->Get());
+    Portal startPortal(startPoint, startPoint, Orientation::TOP, startTile->Get());
+    Portal endPortal(endPoint, endPoint, Orientation::TOP, endTile->Get());
     PortalSearchNode startNode = { -1, -1, &startPortal, &startPortal, false };
     TSet<const Portal*> queuedPortals;
 

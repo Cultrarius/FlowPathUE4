@@ -38,7 +38,7 @@ void flow::FlowTile::initPortalData()
     for (int32 i = 0; i < tileLength; i++) {
         auto val = data[i * tileLength];
         if (start != -1 && val == BLOCKED) {
-            portals.Emplace(0, start, 0, i - 1, LEFT, this);
+            portals.Emplace(0, start, 0, i - 1, Orientation::LEFT, this);
             start = -1;
         }
         else if (start == -1 && val != BLOCKED) {
@@ -46,7 +46,7 @@ void flow::FlowTile::initPortalData()
         }
     }
     if (start != -1) {
-        portals.Emplace(0, start, 0, maxIndex, LEFT, this);
+        portals.Emplace(0, start, 0, maxIndex, Orientation::LEFT, this);
     }
 
     //find right portals
@@ -54,7 +54,7 @@ void flow::FlowTile::initPortalData()
     for (int32 i = 0; i < tileLength; i++) {
         auto val = data[i * tileLength + tileLength - 1];
         if (start != -1 && val == BLOCKED) {
-            portals.Emplace(maxIndex, start, maxIndex, i - 1, RIGHT, this);
+            portals.Emplace(maxIndex, start, maxIndex, i - 1, Orientation::RIGHT, this);
             start = -1;
         }
         else if (start == -1 && val != BLOCKED) {
@@ -62,7 +62,7 @@ void flow::FlowTile::initPortalData()
         }
     }
     if (start != -1) {
-        portals.Emplace(maxIndex, start, maxIndex, maxIndex, RIGHT, this);
+        portals.Emplace(maxIndex, start, maxIndex, maxIndex, Orientation::RIGHT, this);
     }
 
     //find top portals
@@ -70,7 +70,7 @@ void flow::FlowTile::initPortalData()
     for (int32 i = 0; i < tileLength; i++) {
         auto val = data[i];
         if (start != -1 && val == BLOCKED) {
-            portals.Emplace(start, 0, i - 1, 0, TOP, this);
+            portals.Emplace(start, 0, i - 1, 0, Orientation::TOP, this);
             start = -1;
         }
         else if (start == -1 && val != BLOCKED) {
@@ -78,7 +78,7 @@ void flow::FlowTile::initPortalData()
         }
     }
     if (start != -1) {
-        portals.Emplace(start, 0, maxIndex, 0, TOP, this);
+        portals.Emplace(start, 0, maxIndex, 0, Orientation::TOP, this);
     }
 
     //find bottom portals
@@ -86,7 +86,7 @@ void flow::FlowTile::initPortalData()
     for (int32 i = 0; i < tileLength; i++) {
         auto val = data[i + tileLength * maxIndex];
         if (start != -1 && val == BLOCKED) {
-            portals.Emplace(start, maxIndex, i - 1, maxIndex, BOTTOM, this);
+            portals.Emplace(start, maxIndex, i - 1, maxIndex, Orientation::BOTTOM, this);
             start = -1;
         }
         else if (start == -1 && val != BLOCKED) {
@@ -94,7 +94,7 @@ void flow::FlowTile::initPortalData()
         }
     }
     if (start != -1) {
-        portals.Emplace(start, maxIndex, maxIndex, maxIndex, BOTTOM, this);
+        portals.Emplace(start, maxIndex, maxIndex, maxIndex, Orientation::BOTTOM, this);
     }
 
     // connect the portals via flood fill
@@ -185,10 +185,10 @@ TArray<int32> FlowTile::getPortalsIndicesFor(int32 x, int32 y) const {
 
 void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
     for (auto &otherPortal : tile.portals) {
-        if (side == LEFT && otherPortal.orientation != RIGHT ||
-            side == RIGHT && otherPortal.orientation != LEFT ||
-            side == TOP && otherPortal.orientation != BOTTOM ||
-            side == BOTTOM && otherPortal.orientation != TOP) {
+        if (side == Orientation::LEFT && otherPortal.orientation != Orientation::RIGHT ||
+            side == Orientation::RIGHT && otherPortal.orientation != Orientation::LEFT ||
+            side == Orientation::TOP && otherPortal.orientation != Orientation::BOTTOM ||
+            side == Orientation::BOTTOM && otherPortal.orientation != Orientation::TOP) {
             continue;
         }
         for (auto &thisPortal : portals) {
@@ -200,8 +200,8 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
             int32 startY = max(otherPortal.start.Y, thisPortal.start.Y);
             int32 endX = min(otherPortal.end.X, thisPortal.end.X);
             int32 endY = min(otherPortal.end.Y, thisPortal.end.Y);
-            if (((side == TOP || side == BOTTOM) && startX <= endX) ||
-                ((side == LEFT || side == RIGHT) && startY <= endY)) {
+            if (((side == Orientation::TOP || side == Orientation::BOTTOM) && startX <= endX) ||
+                ((side == Orientation::LEFT || side == Orientation::RIGHT) && startY <= endY)) {
                 //TODO we insert a default value of 1 here, which is technically not correct, but we are also lazy
                 otherPortal.connected.Add(&thisPortal, 1);
                 thisPortal.connected.Add(&otherPortal, 1);
@@ -232,7 +232,7 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         return { true, wayPoints, 0 };
     }
 
-    // do an improved A* search with waypoint smoothing
+    // do an improved A* search
     // inspired by https://www.gamasutra.com/view/feature/131505/toward_more_realistic_pathfinding.php
 
     int32 tileSize = tileLength * tileLength;
@@ -272,7 +272,7 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         }
     } while (frontier != end);
 
-    // TODO maybe add path smoothing?
+    // TODO add waypoint smoothing?
     int32 pathCost = getData(start);
     while (frontier != start) {
         wayPoints.Add(frontier);

@@ -7,7 +7,7 @@
 #include "CoreMinimal.h"
 
 namespace flow {
-    enum Orientation {
+    enum class Orientation {
         TOP, BOTTOM, LEFT, RIGHT
     };
 

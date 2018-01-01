@@ -9,10 +9,6 @@
 
 namespace flow {
 
-    enum GridDirection {
-        North, NorthWest, West, SouthWest, South, SouthEast, East, NorthEast
-    };
-
     struct AStarTile {
         int32 pointCost;
         int32 goalCost;
@@ -36,6 +32,7 @@ namespace flow {
         FIntPoint coordinates;
         int32 tileLength;
         TArray<Portal> portals;
+        TMap<Portal*, TArray<uint8>> eikonalMap;
 
         void initPortalData();
 
