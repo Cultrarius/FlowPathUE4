@@ -11,7 +11,7 @@
 using namespace flow;
 using namespace std;
 
-const int MAX_VAL = 255;
+const int MAX_VAL = 10000;
 const int S_RIGHT = 0;
 const int S_LEFT = 1;
 
@@ -29,7 +29,7 @@ struct Wmm {
     float v[3];
     float m[5];
     float fm[5];
-    uint8 dir = -1;
+    int8 dir = -1;
 };
 
 int32 toIndex(const FIntPoint& coordinates, int length)
@@ -85,10 +85,10 @@ float calculateEpsilonGradient(const FVector2D &dd, const FVector2D &dp, const F
     float A = -dd.Y;
     float B = dd.X;
     float C = dd.Y * dp.X - dd.X * dp.Y;
-    float den = B * fn;
+    float den = A* fn + B * fn;
     float t = (A * dn.X + B * dn.Y + C) / den;
 
-    FVector2D x(dn.Y - t * fn, dn.X);
+    FVector2D x(dn.Y - t * fn, dn.X - t * fn);
     if (fabs(dd.X) > 0.0 && fabs(den) > 0.0) {
         epsilon = (x.X - dp.X) / dd.X;
     }
@@ -146,7 +146,6 @@ void flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FI
 {
     int32 length = FMath::Sqrt(sourceData.Num());
     check(length);
-    output->Empty(sourceData.Num());
     TArray<WaveNode> waveSurface;
     waveSurface.AddDefaulted(sourceData.Num());
     
@@ -174,7 +173,7 @@ void flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FI
             winner.p = target;
             trialPair = pair<float, Wmm>(0.0, winner);
             trialSet_it = trialSet.insert(trialPair);
-            mapaPair = pair<int, typename multimap<float, Wmm>::iterator>(index, trialSet_it);
+            mapaPair = pair<int32, typename multimap<float, Wmm>::iterator>(index, trialSet_it);
             mapaTrial.insert(mapaPair);
         }
     }
@@ -244,5 +243,13 @@ void flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FI
                 waveSurface[index].value = valcenter[i];
             }
         }
+    }
+
+    // copy the result to the output
+    output->Empty(sourceData.Num());
+    for (int32 i = 0; i < length * length; i++) {
+        WaveNode& node = waveSurface[i];
+        uint8 sourceVal = sourceData[i];
+        output->Add(sourceVal == 255 ? MAX_VAL : node.value);
     }
 }
