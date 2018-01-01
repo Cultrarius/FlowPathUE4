@@ -142,7 +142,7 @@ float getVal2D(const TArray<uint8>& sourceData, const TArray<WaveNode> &waveSurf
     return val;
 }
 
-void flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FIntPoint> targetPoints, TArray<float>* output)
+TArray<float> flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FIntPoint> targetPoints)
 {
     int32 length = FMath::Sqrt(sourceData.Num());
     check(length);
@@ -246,10 +246,12 @@ void flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FI
     }
 
     // copy the result to the output
-    output->Empty(sourceData.Num());
+    TArray<float> output;
+    output.Reserve(sourceData.Num());
     for (int32 i = 0; i < length * length; i++) {
         WaveNode& node = waveSurface[i];
         uint8 sourceVal = sourceData[i];
-        output->Add(sourceVal == 255 ? MAX_VAL : node.value);
+        output.Add(sourceVal == 255 ? MAX_VAL : node.value);
     }
+    return output;
 }

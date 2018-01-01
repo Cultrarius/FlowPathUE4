@@ -5,6 +5,7 @@
 #include "FlowTile.h"
 #include <queue>
 #include "FlowPath.h"
+#include "WaveMarcher.h"
 
 using namespace std;
 using namespace flow;
@@ -283,6 +284,33 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
     wayPoints.Add(start);
     
     return{ true, wayPoints, pathCost };
+}
+
+const TArray<float>& flow::FlowTile::createMapToPortal(Portal* targetPortal)
+{
+    check(targetPortal);
+    if (eikonalMap.Contains(targetPortal)) {
+        return eikonalMap[targetPortal];
+    }
+    TArray<FIntPoint> targets;
+    auto start = targetPortal->start;
+    targets.Add(start);
+
+    auto distance = targetPortal->end - start;
+    int32 size = distance.Size();
+    if (size > 0) {
+        auto increment = distance / size;
+        for (int i = 0; i < size; i++) {
+            start += increment;
+            targets.Add(start);
+        }
+    }
+    return eikonalMap.Add(targetPortal, createMapToTarget(targets));
+}
+
+TArray<float> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)
+{
+    return CreateEikonalSurface(tileData, targets);
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const

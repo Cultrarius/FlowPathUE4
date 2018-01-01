@@ -32,7 +32,7 @@ namespace flow {
         FIntPoint coordinates;
         int32 tileLength;
         TArray<Portal> portals;
-        TMap<Portal*, TArray<uint8>> eikonalMap;
+        TMap<Portal*, TArray<float>> eikonalMap;
 
         void initPortalData();
 
@@ -69,5 +69,9 @@ namespace flow {
         void removeConnectedPortals();
 
         PathSearchResult findPath(FIntPoint start, FIntPoint end);
+
+        const TArray<float>& createMapToPortal(Portal* targetPortal);
+
+        TArray<float> createMapToTarget(const TArray<FIntPoint>& targets);
     };
 }

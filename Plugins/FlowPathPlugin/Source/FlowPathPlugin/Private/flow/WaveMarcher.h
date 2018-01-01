@@ -13,6 +13,6 @@ namespace flow {
     const FIntPoint neighbors[8] = { FIntPoint(-1, -1), FIntPoint(-1, 0), FIntPoint(-1, 1), FIntPoint(0, 1), 
         FIntPoint(1, 1), FIntPoint(1, 0), FIntPoint(1, -1), FIntPoint(0, -1), };
 
-    void CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FIntPoint> targetPoints, TArray<float>* output);
+    TArray<float> CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FIntPoint> targetPoints);
 }
 
