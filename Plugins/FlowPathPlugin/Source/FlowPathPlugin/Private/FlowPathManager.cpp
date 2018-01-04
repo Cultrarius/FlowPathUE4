@@ -115,25 +115,34 @@ void AFlowPathManager::updateDirtyPathData()
         if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
             float bestTarget = MAX_VAL;
             FIntPoint targetDirection = FIntPoint::ZeroValue;
+            float min = MAX_VAL;
+            float max = 0;
             for (int32 i = 0; i < 8; i++) {
                 float cellValue = flowMap.neighborCells[i];
                 if (flowMap.neighborCells[i] < bestTarget) {
                     bestTarget = cellValue;
                     targetDirection = neighbors[i];
                 }
+                min = FMath::Min(min, cellValue);
+                max = cellValue == MAX_VAL ? max : FMath::Max(max, cellValue);
+            }
+
 #if WITH_EDITOR
-                if (DrawFlowMapAroundAgents) {
+            if (DrawFlowMapAroundAgents) {
+                for (int32 i = 0; i < 8; i++) {
+                    float cellValue = flowMap.neighborCells[i];
                     auto inverted = WorldToTileTransform.Inverse();
                     int32 absoluteX = location.tileLocation.X * tileLength + location.pointInTile.X + xarray[i];
                     int32 absoluteY = location.tileLocation.Y * tileLength + location.pointInTile.Y + yarray[i];
-                    
+
                     FVector2D centerPoint(absoluteX + 0.5, absoluteY + 0.5);
                     auto scaledRadius = inverted.TransformPoint(FVector2D(0.5, 0.5));
-                    FColor color = cellValue == MAX_VAL ? FColor::Black : FMath::Lerp(FLinearColor::Green, FLinearColor::Red, FMath::Clamp(cellValue / 150.0f, 0.0f, 1.0f)).ToFColor(false);
-                    DrawDebugCircle(GetWorld(), toV3(inverted.TransformPoint(centerPoint)), FMath::Min(scaledRadius.X, scaledRadius.Y), 16, color, true, -1, 0, 10, FVector(0, 1, 0), FVector(1, 0, 0));
+                    float alpha = FMath::Clamp((cellValue - min) / (max - min + 1), 0.0f, 1.0f);
+                    FColor color = cellValue == MAX_VAL ? FColor::Purple : FMath::Lerp(FLinearColor::Green, FLinearColor::Red, alpha).ToFColor(false);
+                    DrawDebugCircle(GetWorld(), toV3(inverted.TransformPoint(centerPoint)), FMath::Min(scaledRadius.X, scaledRadius.Y), 16, color, false, 2, 0, 5, FVector(0, 1, 0), FVector(1, 0, 0));
                 }
-#endif		// WITH_EDITOR
             }
+#endif		// WITH_EDITOR
 
             data.targetAcceleration = FVector2D(targetDirection.X, targetDirection.Y);
         }

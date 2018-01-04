@@ -291,6 +291,7 @@ void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<flo
     int32 selfIndex = p.pointInTile.X + p.pointInTile.Y * tileLength;
     float flowVal = flowMap[selfIndex];
     result.cellValue = flowVal;
+    bool standingOnPortal = flowVal == 0 && nextPortalOrientation != Orientation::NONE;
 
     for (int32 i = 0; i < 8; i++) {
         auto neighbor = p.pointInTile + neighbors[i];
@@ -298,7 +299,7 @@ void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<flo
         int32 tileDeltaY = neighbor.Y < 0 ? -1 : (neighbor.Y >= tileLength ? 1 : 0);
         if (tileDeltaX == 0 && tileDeltaY == 0) {
             int32 index = neighbor.X + neighbor.Y * tileLength;
-            result.neighborCells[i] = flowMap[index];
+            result.neighborCells[i] = flowMap[index] + (standingOnPortal ? 300 : 0);
         }
         else {
             // The neighbor is on another tile, so we have no flowmap for it.
@@ -324,21 +325,21 @@ void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<flo
             }
             
             // check to see if we are following a portal and the neighbor cell is part of the next portal
-            if (flowVal == 0 && nextPortalOrientation != Orientation::NONE) {
-                if (nextPortalOrientation == Orientation::TOP && tileDeltaX == 0 && tileDeltaY == 1) {
-                    result.neighborCells[i] = 1;
+            if (standingOnPortal) {
+                if (nextPortalOrientation == Orientation::TOP && tileDeltaX == 0 && tileDeltaY == -1) {
+                    result.neighborCells[i] = val;
                     continue;
                 }
-                if (nextPortalOrientation == Orientation::BOTTOM && tileDeltaX == 0 && tileDeltaY == -1) {
-                    result.neighborCells[i] = 1;
+                if (nextPortalOrientation == Orientation::BOTTOM && tileDeltaX == 0 && tileDeltaY == 1) {
+                    result.neighborCells[i] = val;
                     continue;
                 }
                 if (nextPortalOrientation == Orientation::RIGHT && tileDeltaX == 1 && tileDeltaY == 0) {
-                    result.neighborCells[i] = 1;
+                    result.neighborCells[i] = val;
                     continue;
                 }
                 if (nextPortalOrientation == Orientation::LEFT && tileDeltaX == -1 && tileDeltaY == 0) {
-                    result.neighborCells[i] = 1;
+                    result.neighborCells[i] = val;
                     continue;
                 }
             }

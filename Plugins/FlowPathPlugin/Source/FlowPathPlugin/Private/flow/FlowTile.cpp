@@ -323,7 +323,7 @@ const TArray<float>& flow::FlowTile::createMapToPortal(const Portal* targetPorta
 
 TArray<float> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)
 {
-    return CreateEikonalSurface(tileData, targets);
+    return CreateEikonalSurface(getData(), targets);
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const
