@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "FlowPathManager.h"
+#include "NavAgent.h"
 #include "Components/ActorComponent.h"
 #include "FlowPathComponent.generated.h"
 
@@ -11,11 +12,13 @@
  * 
  */
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent), BlueprintType, Blueprintable)
-class FLOWPATHPLUGIN_API UFlowPathComponent : public UActorComponent
+class FLOWPATHPLUGIN_API UFlowPathComponent : public UActorComponent, public INavAgent
 {
 	GENERATED_BODY()
 
-	
+private:
+    FAgentInfo agentInfo;
+
 public:
 
     UFlowPathComponent();
@@ -44,17 +47,30 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = SteeringComponent)
     uint32 bTickBeforeOwner : 1;
 
+    //~ Begin NavAgent Interface 
+
+    UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
+        FAgentInfo GetAgentInfo() const;
+        virtual FAgentInfo GetAgentInfo_Implementation() const override;
+
+    UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
+        void UpdateAcceleration(const FVector2D& newAcceleration);
+        virtual void UpdateAcceleration_Implementation(const FVector2D& newAcceleration) override;
+
+    UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
+        void TargetReached();
+        virtual void TargetReached_Implementation();
+
+    //~ End NavAgent Interface
+
     //~ Begin ActorComponent Interface 
     virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
     virtual void RegisterComponentTickFunctions(bool bRegister) override;
     virtual void PostLoad() override;
     virtual void Serialize(FArchive& Ar) override;
-
-    /** Overridden to auto-register the updated component if it starts NULL, and we can find a root component on our owner. */
     virtual void InitializeComponent() override;
-
-    /** Overridden to update component properties that should be updated while being edited. */
     virtual void OnRegister() override;
+    //~ End ActorComponent Interface
 
     /**
     * Possibly skip update if moved component is not rendered or can't move.
@@ -69,4 +85,8 @@ public:
     /** Assign the flow path manager which has the path steering info. */
     UFUNCTION(BlueprintCallable, Category = "Components|Steering")
     virtual void SetFlowPathManager(AFlowPathManager* NewFlowPathManager);
+
+    /** Assign the pawn we update. */
+    UFUNCTION(BlueprintCallable, Category = "Components|Steering")
+    virtual void MovePawnToTarget(FVector2D Target);
 };

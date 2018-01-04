@@ -11,7 +11,6 @@
 using namespace flow;
 using namespace std;
 
-const int MAX_VAL = 10000;
 const int S_RIGHT = 0;
 const int S_LEFT = 1;
 

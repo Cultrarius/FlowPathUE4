@@ -25,6 +25,21 @@ namespace flow {
         int32 pathCost;
     };
 
+    struct FlowPortalKey {
+        const Portal* targetPortal;
+        const Portal* connectedPortal;
+
+        bool operator==(const FlowPortalKey& Other) const
+        {
+            return targetPortal == Other.targetPortal && connectedPortal == Other.connectedPortal;
+        }
+        
+        friend uint32 GetTypeHash(const FlowPortalKey& Other)
+        {
+            return PointerHash(Other.targetPortal, PointerHash(Other.connectedPortal));
+        }
+    };
+
     class FlowTile {
     private:
         TArray<uint8> tileData;
@@ -32,7 +47,7 @@ namespace flow {
         FIntPoint coordinates;
         int32 tileLength;
         TArray<Portal> portals;
-        TMap<Portal*, TArray<float>> eikonalMap;
+        TMap<FlowPortalKey, TArray<float>> eikonalMaps;
 
         void initPortalData();
 
@@ -70,7 +85,7 @@ namespace flow {
 
         PathSearchResult findPath(FIntPoint start, FIntPoint end);
 
-        const TArray<float>& createMapToPortal(Portal* targetPortal);
+        const TArray<float>& createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal);
 
         TArray<float> createMapToTarget(const TArray<FIntPoint>& targets);
     };

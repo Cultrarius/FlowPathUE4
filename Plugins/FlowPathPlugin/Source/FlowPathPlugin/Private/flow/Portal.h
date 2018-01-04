@@ -8,7 +8,7 @@
 
 namespace flow {
     enum class Orientation {
-        TOP, BOTTOM, LEFT, RIGHT
+        NONE, TOP, BOTTOM, LEFT, RIGHT
     };
 
     class FlowTile;

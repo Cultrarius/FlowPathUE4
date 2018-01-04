@@ -15,6 +15,21 @@ UFlowPathComponent::UFlowPathComponent()
 }
 
 
+FAgentInfo UFlowPathComponent::GetAgentInfo_Implementation() const
+{
+    return agentInfo;
+}
+
+void UFlowPathComponent::UpdateAcceleration_Implementation(const FVector2D & newAcceleration)
+{
+    // TODO set agent movement
+}
+
+void UFlowPathComponent::TargetReached_Implementation()
+{
+    agentInfo.isPathfindingActive = false;
+}
+
 void UFlowPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction * ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -28,6 +43,9 @@ void UFlowPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
         SetUpdatedPawn(nullptr);
         return;
     }
+    auto actorLocation = UpdatedPawn->GetActorLocation();
+    agentInfo.agentLocation.X = actorLocation.X;
+    agentInfo.agentLocation.Y = actorLocation.Y;
 
     UpdatedPawn->AddMovementInput(FVector(0, 0, 0));
 }
@@ -138,10 +156,26 @@ void UFlowPathComponent::SetUpdatedPawn(APawn * NewUpdatedPawn)
 {
     // Don't assign pending kill components, but allow those to null out previous UpdatedComponent.
     UpdatedPawn = IsValid(NewUpdatedPawn) ? NewUpdatedPawn : NULL;
+    if (!IsValid(UpdatedPawn)) {
+        agentInfo.isPathfindingActive = false;
+    }
 }
 
 void UFlowPathComponent::SetFlowPathManager(AFlowPathManager * NewFlowPathManager)
 {
+    if (IsValid(FlowPathManager)) {
+        FlowPathManager->RemoveAgent(this);
+    }
+
     // Don't assign pending kill components, but allow those to null out previous UpdatedComponent.
     FlowPathManager = IsValid(NewFlowPathManager) ? NewFlowPathManager : NULL;
+    if (IsValid(FlowPathManager)) {
+        FlowPathManager->RegisterAgent(this);
+    }
+}
+
+void UFlowPathComponent::MovePawnToTarget(FVector2D Target)
+{
+    agentInfo.isPathfindingActive = true;
+    agentInfo.targetLocation = Target;
 }

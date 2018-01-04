@@ -146,9 +146,6 @@ void flow::FlowTile::initPortalData()
                         if (!portalPath.success) {
                             continue;
                         }
-                        if (portalPath.pathCost == 0) {
-                            UE_LOG(LogExec, Warning, TEXT("  From %d, %d -> %d, %d"), portal->center.X, portal->center.Y, otherPortal->center.X, otherPortal->center.Y);
-                        }
                         portal->connected.Add(otherPortal, portalPath.pathCost);
                         otherPortal->connected.Add(portal, portalPath.pathCost);
                     }
@@ -203,7 +200,7 @@ void FlowTile::connectOverlappingPortals(FlowTile &tile, Orientation side) {
             int32 endY = min(otherPortal.end.Y, thisPortal.end.Y);
             if (((side == Orientation::TOP || side == Orientation::BOTTOM) && startX <= endX) ||
                 ((side == Orientation::LEFT || side == Orientation::RIGHT) && startY <= endY)) {
-                //TODO we insert a default value of 1 here, which is technically not correct, but we are also lazy
+                //TODO we insert a default value of 1 here, which is technically not correct (just lazy)
                 otherPortal.connected.Add(&thisPortal, 1);
                 thisPortal.connected.Add(&otherPortal, 1);
             }
@@ -286,26 +283,42 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
     return{ true, wayPoints, pathCost };
 }
 
-const TArray<float>& flow::FlowTile::createMapToPortal(Portal* targetPortal)
+const TArray<float>& flow::FlowTile::createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal)
 {
     check(targetPortal);
-    if (eikonalMap.Contains(targetPortal)) {
-        return eikonalMap[targetPortal];
+    check(connectedPortal);
+    check(targetPortal->connected.Contains(connectedPortal));
+    FlowPortalKey key = { targetPortal, connectedPortal };
+    if (eikonalMaps.Contains(key)) {
+        return eikonalMaps[key];
     }
     TArray<FIntPoint> targets;
-    auto start = targetPortal->start;
-    targets.Add(start);
 
-    auto distance = targetPortal->end - start;
-    int32 size = distance.Size();
-    if (size > 0) {
-        auto increment = distance / size;
-        for (int i = 0; i < size; i++) {
-            start += increment;
-            targets.Add(start);
-        }
+    // only use points shared by both portals
+    int32 startX = targetPortal->start.X;
+    int32 startY = targetPortal->start.Y;
+    int32 endX = targetPortal->end.X;    
+    int32 endY = targetPortal->end.Y;
+    if (targetPortal->orientation == Orientation::LEFT || targetPortal->orientation == Orientation::RIGHT) {
+        startY = max(connectedPortal->start.Y, startY);
+        endY = min(connectedPortal->end.Y, endY);
     }
-    return eikonalMap.Add(targetPortal, createMapToTarget(targets));
+    if (targetPortal->orientation == Orientation::TOP || targetPortal->orientation == Orientation::BOTTOM) {
+        startX = max(connectedPortal->start.X, startX);
+        endX = min(connectedPortal->end.X, endX);
+    }
+    check(startX <= endX);
+    check(startY <= endY);
+
+    FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
+    FIntPoint current(startX, startY);
+    FIntPoint end(endX, endY);
+    do {
+        targets.Add(current);
+        current += increment;
+    } while (current != end);
+
+    return eikonalMaps.Add(key, createMapToTarget(targets));
 }
 
 TArray<float> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)

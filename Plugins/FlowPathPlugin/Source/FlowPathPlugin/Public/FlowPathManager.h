@@ -5,7 +5,25 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "flow/FlowPath.h"
+#include "NavAgent.h"
+#include "TransformCalculus2D.h"
 #include "FlowPathManager.generated.h"
+
+struct AgentData {
+    UObject* agent;
+
+    // data from the current tick
+    FAgentInfo current;
+
+    // data from the last tick
+    FAgentInfo lastTick;
+
+    // pathfinding data
+    bool isPathDataDirty = false;
+    FVector2D targetAcceleration;
+    TArray<const flow::Portal*> waypoints;
+    int32 waypointIndex;
+};
 
 UCLASS(meta = (BlueprintSpawnableComponent), BlueprintType)
 class FLOWPATHPLUGIN_API AFlowPathManager : public AActor
@@ -14,11 +32,19 @@ class FLOWPATHPLUGIN_API AFlowPathManager : public AActor
 private:
     TUniquePtr<flow::FlowPath> flowPath;
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+    TMap<UObject*, AgentData> agents;
 
-    FVector2D toTile(FVector worldPosition);
+    FTransform2D WorldToTileTransform;
+
+    void updateDirtyPathData();
+
+protected:
+
+    FVector2D toTile(FVector2D worldPosition) const;
+
+    flow::TilePoint toTilePoint(FVector2D worldPosition) const;
+
+    flow::TilePoint absoluteTilePosToTilePoint(FVector2D tilePosition) const;
 
 public:	
 
@@ -30,11 +56,19 @@ public:
     *   Bigger tiles increase performance and memory needs, but lead to smoother pathfinding.
     */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
-    int32 tileLength = 10;
+    int32 tileLength;
 
-    /** The transformation to convert a world position into a tile position (e.g. [100, 250, 30] -> [1, 2.5, 0]). The Z value of the result is always discarded. */
+    /** The translation to convert a world position into a tile position (e.g. [100, 250] -> [105, 255]). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
-    FTransform WorldToTileTransform = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector(0.1f, 0.1f, 0));
+    FVector2D WorldToTileTranslation;
+
+    /** The scale to convert a world position into a tile position (e.g. [100, 250] -> [1, 2.5]). */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
+    FVector2D WorldToTileScale;
+
+    /** The world-distance to the target at which the pathfinder marks a query as finished. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
+    float AcceptanceRadius;
 
     AFlowPathManager();
 
@@ -46,7 +80,7 @@ public:
 
     /** Updates the specified tile with the given data. The data must *not* contain 0 values. The given world vector is transformed and truncated into tile coordinates.*/
     UFUNCTION(BlueprintCallable, Category = "FlowPath")
-    bool UpdateMapTileWorld(FVector worldPosition, const TArray<uint8> &tileData);
+    bool UpdateMapTileWorld(FVector2D worldPosition, const TArray<uint8> &tileData);
 
     /** Updates the specified tile with the given data. The data must *not* contain 0 values. */
     UFUNCTION(BlueprintCallable, Category = "FlowPath")
@@ -57,8 +91,15 @@ public:
     bool UpdateMapTilesFromTexture(int32 tileXUpperLeft, int32 tileYUpperLeft, UTexture2D* texture);
 
     UFUNCTION(BlueprintCallable, Category = "FlowPath")
-    uint8 GetTileDataForWorldPosition(FVector worldPosition);
+    uint8 GetTileDataForWorldPosition(FVector2D worldPosition);
 
+    /** Registers an agent with this path manager, so it can be steered together with other agents. */
+    UFUNCTION(BlueprintCallable, Category = "FlowPath")
+    void RegisterAgent(UObject* agent);
+
+    /** Removes a previously registered agent from the path manager. */
+    UFUNCTION(BlueprintCallable, Category = "FlowPath")
+    void RemoveAgent(UObject* agent);
 
 #if WITH_EDITOR
 
@@ -67,6 +108,12 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "FlowPath")
      void DebugDrawAllPortals();
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath")
+    bool DrawFlowMapAroundAgents;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath")
+    bool DrawAgentPortalWaypoints;
 
 #endif		// WITH_EDITOR
 

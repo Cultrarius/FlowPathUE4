@@ -48,6 +48,16 @@ namespace flow {
         FIntPoint pointInTile;
     };
 
+    struct TileVector {
+        TilePoint start;
+        TilePoint end;
+    };
+
+    struct FlowMapExtract {
+        float cellValue;
+        float neighborCells[8];
+    };
+
     class FlowPath {
     private:
         TArray<uint8> emptyTileData;
@@ -55,7 +65,6 @@ namespace flow {
 
         int32 tileLength;
         TMap<FIntPoint, TUniquePtr<FlowTile>> tileMap;
-        TMap<Agent *, TUniquePtr<Agent>> agents;
 
         void updatePortals(FIntPoint tileCoordinates);
 
@@ -65,16 +74,12 @@ namespace flow {
 
         int32 calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const;
 
+        void extractPartialFlowmap(const TilePoint& p, const TArray<float>& flowMap, Orientation nextPortalOrientation, FlowMapExtract& result) const;
+
     public:
         explicit FlowPath(int32 tileLength);
 
         bool updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tileData);
-
-        void addAgent(TUniquePtr<Agent> agent);
-
-        void killAgent(Agent *agent);
-
-        void updateAgents();
 
         uint8 getDataFor(const TilePoint& p) const;
 
@@ -82,8 +87,12 @@ namespace flow {
 
         PortalSearchResult findPortalPath(const TilePoint& start, const TilePoint& end) const;
 
+        PortalSearchResult findPortalPath(const TileVector& vector) const;
+
         TArray<FIntPoint> getAllValidTileCoordinates() const;
 
         TArray<const Portal*> getAllPortals() const;
+
+        bool getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract& result);
     };
 }
