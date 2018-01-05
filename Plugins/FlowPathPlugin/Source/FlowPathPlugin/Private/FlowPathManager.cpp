@@ -168,17 +168,17 @@ void AFlowPathManager::updateDirtyPathData()
 
 #if WITH_EDITOR
             if (DrawFlowMapAroundAgents) {
+                auto inverted = WorldToTileTransform.Inverse();
+                int32 absoluteX = location.tileLocation.X * tileLength + location.pointInTile.X;
+                int32 absoluteY = location.tileLocation.Y * tileLength + location.pointInTile.Y;
+                FVector2D centerPoint(absoluteX + 0.5, absoluteY + 0.5);
+                auto tileCenter = toV3(inverted.TransformPoint(centerPoint));
                 for (int32 i = 0; i < 8; i++) {
                     float cellValue = flowMap.neighborCells[i];
-                    auto inverted = WorldToTileTransform.Inverse();
-                    int32 absoluteX = location.tileLocation.X * tileLength + location.pointInTile.X + xarray[i];
-                    int32 absoluteY = location.tileLocation.Y * tileLength + location.pointInTile.Y + yarray[i];
-
-                    FVector2D centerPoint(absoluteX + 0.5, absoluteY + 0.5);
-                    auto scaledRadius = inverted.TransformPoint(FVector2D(0.5, 0.5));
+                    auto neighborDirection = toV3(inverted.TransformPoint(normalizedNeighbors[i] / 2));
                     float alpha = FMath::Clamp((cellValue - min) / (max - min + 1), 0.0f, 1.0f);
                     FColor color = cellValue == MAX_VAL ? FColor::Purple : FMath::Lerp(FLinearColor::Green, FLinearColor::Red, alpha).ToFColor(false);
-                    DrawDebugCircle(GetWorld(), toV3(inverted.TransformPoint(centerPoint)), FMath::Min(scaledRadius.X, scaledRadius.Y), 16, color, false, 2, 0, 5, FVector(0, 1, 0), FVector(1, 0, 0));
+                    DrawDebugDirectionalArrow(GetWorld(), tileCenter, tileCenter + neighborDirection, 100, color, true, -1, 2, 4);
                 }
             }
 #endif		// WITH_EDITOR
