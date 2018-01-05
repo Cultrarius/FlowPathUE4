@@ -43,7 +43,7 @@ public:
     UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
         FAgentInfo GetAgentInfo() const;
 
-    /** Updates the direction this agent should move to in order to reach its target. */
+    /** Updates the direction this agent should move to in order to reach its target. The vector is normalized to a length between 0 and 1. */
     UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
         void UpdateAcceleration(const FVector2D& newAcceleration);
 

@@ -40,11 +40,15 @@ private:
 
 protected:
 
+    FVector2D toAbsoluteTileLocation(flow::TilePoint p) const;
+
     FVector2D toTile(FVector2D worldPosition) const;
 
     flow::TilePoint toTilePoint(FVector2D worldPosition) const;
 
     flow::TilePoint absoluteTilePosToTilePoint(FVector2D tilePosition) const;
+
+    bool findNextSmoothedWaypoint(const AgentData& data, flow::TilePoint& result) const;
 
 public:	
 

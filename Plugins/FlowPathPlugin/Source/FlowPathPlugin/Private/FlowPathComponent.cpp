@@ -22,12 +22,13 @@ FAgentInfo UFlowPathComponent::GetAgentInfo_Implementation() const
 
 void UFlowPathComponent::UpdateAcceleration_Implementation(const FVector2D & newAcceleration)
 {
-    // TODO set agent movement
+    acceleration = newAcceleration;
 }
 
 void UFlowPathComponent::TargetReached_Implementation()
 {
     agentInfo.isPathfindingActive = false;
+    acceleration = FVector2D::ZeroVector;
 }
 
 void UFlowPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction * ThisTickFunction)
@@ -47,7 +48,7 @@ void UFlowPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
     agentInfo.agentLocation.X = actorLocation.X;
     agentInfo.agentLocation.Y = actorLocation.Y;
 
-    UpdatedPawn->AddMovementInput(FVector(0, 0, 0));
+    UpdatedPawn->AddMovementInput(FVector(acceleration.X, acceleration.Y, 0));
 }
 
 void UFlowPathComponent::RegisterComponentTickFunctions(bool bRegister)

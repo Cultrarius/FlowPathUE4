@@ -18,6 +18,7 @@ class FLOWPATHPLUGIN_API UFlowPathComponent : public UActorComponent, public INa
 
 private:
     FAgentInfo agentInfo;
+    FVector2D acceleration;
 
 public:
 

@@ -88,7 +88,7 @@ void AFlowPathManager::updateDirtyPathData()
 
         // check and update the portal waypoint data
         bool isWaypointDataDirty = false;
-        if (data.waypoints.Num() > 0) {
+        if (data.waypoints.Num() > 0 && data.waypoints.Num() > data.waypointIndex) {
             if (data.waypoints[data.waypointIndex + 1]->parentTile->getCoordinates() == location.tileLocation) {
                 isWaypointDataDirty = false;
                 data.waypointIndex += 2;
@@ -114,17 +114,42 @@ void AFlowPathManager::updateDirtyPathData()
 
         if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
             float bestTarget = MAX_VAL;
-            FIntPoint targetDirection = FIntPoint::ZeroValue;
+            FVector2D targetDirection = FVector2D::ZeroVector;
             float min = MAX_VAL;
             float max = 0;
+            TArray<int32> candidates;
             for (int32 i = 0; i < 8; i++) {
                 float cellValue = flowMap.neighborCells[i];
-                if (flowMap.neighborCells[i] < bestTarget) {
+                if (cellValue < bestTarget) {
                     bestTarget = cellValue;
-                    targetDirection = neighbors[i];
+                    candidates.Empty(1);
+                    candidates.Add(i);
+                    
+                }
+                else if (bestTarget != MAX_VAL && cellValue == bestTarget) {
+                    candidates.Add(i);
                 }
                 min = FMath::Min(min, cellValue);
                 max = cellValue == MAX_VAL ? max : FMath::Max(max, cellValue);
+            }
+
+            if (candidates.Num() == 1) {
+                targetDirection = normalizedNeighbors[candidates[0]];
+            }
+            else if (candidates.Num() > 1) {
+                TilePoint expectedWaypoint;
+                if (!findNextSmoothedWaypoint(data, expectedWaypoint)) {
+                    expectedWaypoint = target;
+                }
+
+                targetDirection = normalizedNeighbors[candidates[0]];
+                FVector2D waypointDirection = (toAbsoluteTileLocation(expectedWaypoint) - toAbsoluteTileLocation(location)).GetSafeNormal();
+                for (int32 i = 1; i < candidates.Num(); i++) {
+                    FVector2D newDirection = normalizedNeighbors[candidates[i]];
+                    if ((waypointDirection - newDirection).SizeSquared() < (waypointDirection - targetDirection).SizeSquared()) {
+                        targetDirection = newDirection;
+                    }
+                }
             }
 
 #if WITH_EDITOR
@@ -155,6 +180,13 @@ void AFlowPathManager::updateDirtyPathData()
     }
 }
 
+FVector2D AFlowPathManager::toAbsoluteTileLocation(flow::TilePoint p) const
+{
+    int32 absoluteX = p.tileLocation.X * tileLength + p.pointInTile.X;
+    int32 absoluteY = p.tileLocation.Y * tileLength + p.pointInTile.Y;
+    return FVector2D(absoluteX, absoluteY);
+}
+
 FVector2D AFlowPathManager::toTile(FVector2D worldPosition) const
 {
     return FVector2D(WorldToTileTransform.TransformPoint(worldPosition) / tileLength);
@@ -173,6 +205,24 @@ TilePoint AFlowPathManager::absoluteTilePosToTilePoint(FVector2D tilePos) const
     int32 x = FMath::Abs(tilePos.X - tileX) * tileLength;
     int32 y = FMath::Abs(tilePos.Y - tileY) * tileLength;
     return { FIntPoint(tileX, tileY), FIntPoint(x, y) };
+}
+
+bool AFlowPathManager::findNextSmoothedWaypoint(const AgentData& data, TilePoint& result) const
+{
+    int32 index = data.waypointIndex;
+    int32 count = data.waypoints.Num();
+    if (count > index + 3) {
+        FIntPoint currentWaypointTile = data.waypoints[index]->parentTile->getCoordinates();
+        for (int32 i = index + 3; i < count; i += 2) {
+            FIntPoint nextWaypointTile = data.waypoints[index]->parentTile->getCoordinates();
+            if (nextWaypointTile.X != currentWaypointTile.X && nextWaypointTile.Y != currentWaypointTile.Y) {
+                result.tileLocation = nextWaypointTile;
+                result.pointInTile = data.waypoints[index]->center;
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void AFlowPathManager::Tick(float DeltaTime)
