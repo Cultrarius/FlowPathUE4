@@ -38,6 +38,10 @@ private:
 
     void updateDirtyPathData();
 
+    float calcVelocityBonus(const FVector2D& velocityDirection, int32 i) const;
+
+    float calcWaypointBonus(const FVector2D& waypointDirection, int32 i) const;
+
 protected:
 
     FVector2D toAbsoluteTileLocation(flow::TilePoint p) const;
@@ -48,7 +52,7 @@ protected:
 
     flow::TilePoint absoluteTilePosToTilePoint(FVector2D tilePosition) const;
 
-    bool findNextSmoothedWaypoint(const AgentData& data, flow::TilePoint& result) const;
+    bool findClosestWaypoint(const AgentData& data, const flow::TilePoint& agentLocation, flow::TilePoint& result) const;
 
 public:	
 
@@ -73,6 +77,14 @@ public:
     /** The world-distance to the target at which the pathfinder marks a query as finished. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     float AcceptanceRadius;
+
+    /** The better a target cell direction aligns with the current agent velocity, the more its value gets boosted by the bonus (ranges from -1 to 1). */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
+    float VelocityBonus;
+
+    /** The better a cell aligns with the next waypoint, the more its value gets boosted by the bonus (ranges from -1 to 1). */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
+    float WaypointBonus;
 
     AFlowPathManager();
 

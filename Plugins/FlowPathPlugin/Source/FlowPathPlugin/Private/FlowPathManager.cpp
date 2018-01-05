@@ -12,6 +12,8 @@ AFlowPathManager::AFlowPathManager()
     WorldToTileScale = FVector2D(0.1f, 0.1f);
     AcceptanceRadius = 10;
     tileLength = 10;
+    VelocityBonus = 0.5;
+    WaypointBonus = 0.5;
     DrawFlowMapAroundAgents = true;
     DrawAgentPortalWaypoints = true;
 
@@ -115,16 +117,31 @@ void AFlowPathManager::updateDirtyPathData()
         if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
             float bestTarget = MAX_VAL;
             FVector2D targetDirection = FVector2D::ZeroVector;
+            FVector2D agentVelocity = (data.current.agentLocation - data.lastTick.agentLocation).GetSafeNormal();
+            TilePoint expectedWaypoint;
+            if (!findClosestWaypoint(data, location, expectedWaypoint)) {
+                expectedWaypoint = target;
+            }
+            FVector2D waypointDirection = (toAbsoluteTileLocation(expectedWaypoint) - toAbsoluteTileLocation(location)).GetSafeNormal();
             float min = MAX_VAL;
             float max = 0;
             TArray<int32> candidates;
+            //UE_LOG(LogExec, Error, TEXT("-------"));
             for (int32 i = 0; i < 8; i++) {
                 float cellValue = flowMap.neighborCells[i];
+                if (cellValue == MAX_VAL) {
+                    continue;
+                }
+                if (VelocityBonus != 0 && agentVelocity != FVector2D::ZeroVector) {
+                    cellValue -= calcVelocityBonus(agentVelocity, i);
+                }
+                if (WaypointBonus != 0) {
+                    cellValue -= calcWaypointBonus(waypointDirection, i);
+                }
                 if (cellValue < bestTarget) {
                     bestTarget = cellValue;
                     candidates.Empty(1);
                     candidates.Add(i);
-                    
                 }
                 else if (bestTarget != MAX_VAL && cellValue == bestTarget) {
                     candidates.Add(i);
@@ -137,17 +154,14 @@ void AFlowPathManager::updateDirtyPathData()
                 targetDirection = normalizedNeighbors[candidates[0]];
             }
             else if (candidates.Num() > 1) {
-                TilePoint expectedWaypoint;
-                if (!findNextSmoothedWaypoint(data, expectedWaypoint)) {
-                    expectedWaypoint = target;
-                }
-
-                targetDirection = normalizedNeighbors[candidates[0]];
-                FVector2D waypointDirection = (toAbsoluteTileLocation(expectedWaypoint) - toAbsoluteTileLocation(location)).GetSafeNormal();
-                for (int32 i = 1; i < candidates.Num(); i++) {
-                    FVector2D newDirection = normalizedNeighbors[candidates[i]];
-                    if ((waypointDirection - newDirection).SizeSquared() < (waypointDirection - targetDirection).SizeSquared()) {
-                        targetDirection = newDirection;
+                // we have multiple identical cell values to choose from, pick the one that is best without the applied bonuses
+                bestTarget = MAX_VAL;
+                for (int32 i = 0; i < candidates.Num(); i++) {
+                    int32 index = candidates[i];
+                    float cellValue = flowMap.neighborCells[index];
+                    if (cellValue < bestTarget) {
+                        bestTarget = cellValue;
+                        targetDirection = normalizedNeighbors[index];
                     }
                 }
             }
@@ -180,6 +194,22 @@ void AFlowPathManager::updateDirtyPathData()
     }
 }
 
+float AFlowPathManager::calcVelocityBonus(const FVector2D& velocityDirection, int32 i) const
+{
+    float distance = (velocityDirection - normalizedNeighbors[i]).Size();
+    float bonus = (-distance + 1) * VelocityBonus;
+    //UE_LOG(LogExec, Error, TEXT("Velocity %f, %f / Vector %f, %f / Bonus %f / Distance %f"), velocityDirection.X, velocityDirection.Y, normalizedNeighbors[i].X, normalizedNeighbors[i].Y, bonus, distance);
+    return bonus;
+}
+
+float AFlowPathManager::calcWaypointBonus(const FVector2D& waypointDirection, int32 i) const
+{
+    float distance = (waypointDirection - normalizedNeighbors[i]).Size();
+    float bonus = (-distance + 1) * WaypointBonus;
+    //UE_LOG(LogExec, Error, TEXT("Waypoint %f, %f / Vector %f, %f / Bonus %f / Distance %f"), waypointDirection.X, waypointDirection.Y, normalizedNeighbors[i].X, normalizedNeighbors[i].Y, bonus, distance);
+    return bonus;
+}
+
 FVector2D AFlowPathManager::toAbsoluteTileLocation(flow::TilePoint p) const
 {
     int32 absoluteX = p.tileLocation.X * tileLength + p.pointInTile.X;
@@ -207,20 +237,31 @@ TilePoint AFlowPathManager::absoluteTilePosToTilePoint(FVector2D tilePos) const
     return { FIntPoint(tileX, tileY), FIntPoint(x, y) };
 }
 
-bool AFlowPathManager::findNextSmoothedWaypoint(const AgentData& data, TilePoint& result) const
+bool AFlowPathManager::findClosestWaypoint(const AgentData& data, const flow::TilePoint& agentLocation, TilePoint& result) const
 {
     int32 index = data.waypointIndex;
     int32 count = data.waypoints.Num();
-    if (count > index + 3) {
-        FIntPoint currentWaypointTile = data.waypoints[index]->parentTile->getCoordinates();
-        for (int32 i = index + 3; i < count; i += 2) {
-            FIntPoint nextWaypointTile = data.waypoints[index]->parentTile->getCoordinates();
-            if (nextWaypointTile.X != currentWaypointTile.X && nextWaypointTile.Y != currentWaypointTile.Y) {
-                result.tileLocation = nextWaypointTile;
-                result.pointInTile = data.waypoints[index]->center;
-                return true;
+    if (count > index) {
+        auto portal = data.waypoints[index];
+        result.tileLocation = portal->parentTile->getCoordinates();
+        if (result.tileLocation == agentLocation.tileLocation) {
+            result.pointInTile = portal->start;
+            int32 bestDistance = (result.pointInTile - agentLocation.pointInTile).SizeSquared();
+            for (int x = portal->start.X; x <= portal->end.X; x++) {
+                for (int y = portal->start.Y; y <= portal->end.Y; y++) {
+                    FIntPoint p(x, y);
+                    int32 distance = (p - agentLocation.pointInTile).SizeSquared();
+                    if (distance < bestDistance) {
+                        result.pointInTile = p;
+                        bestDistance = distance;
+                    }
+                }
             }
         }
+        else {
+            result.pointInTile = portal->center;
+        }
+        return true;
     }
     return false;
 }
