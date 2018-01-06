@@ -2,7 +2,7 @@
 
 #include "FlowPathManager.h"
 #include "DrawDebugHelpers.h"
-#include "flow/WaveMarcher.h"
+#include "flow/EikonalSolver.h"
 
 using namespace flow;
 

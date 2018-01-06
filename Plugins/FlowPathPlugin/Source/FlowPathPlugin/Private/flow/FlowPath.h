@@ -8,9 +8,6 @@
 
 namespace flow {
     
-    const uint8 EMPTY = 1;
-    const uint8 BLOCKED = 255;
-
     struct Agent {
         FVector2D acceleration;
         float xPos;

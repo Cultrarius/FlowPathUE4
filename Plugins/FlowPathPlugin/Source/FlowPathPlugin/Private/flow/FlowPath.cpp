@@ -3,7 +3,7 @@
 //
 
 #include "FlowPath.h"
-#include "flow/WaveMarcher.h"
+#include "flow/EikonalSolver.h"
 #include <iostream>
 
 using namespace std;

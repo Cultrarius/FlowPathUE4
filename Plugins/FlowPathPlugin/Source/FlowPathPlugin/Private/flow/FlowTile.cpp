@@ -5,7 +5,7 @@
 #include "FlowTile.h"
 #include <queue>
 #include "FlowPath.h"
-#include "WaveMarcher.h"
+#include "EikonalSolver.h"
 
 using namespace std;
 using namespace flow;

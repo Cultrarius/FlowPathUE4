@@ -2,7 +2,7 @@
 
 #include "FlowPathPlugin.h"
 #include "flow/FlowPath.h"
-#include "flow/WaveMarcher.h"
+#include "flow/EikonalSolver.h"
 
 #define LOCTEXT_NAMESPACE "FFlowPathPluginModule"
 
@@ -85,8 +85,8 @@ void FFlowPathPluginModule::StartupModule()
     };
     TArray<FIntPoint> targets;
     targets.Emplace(0, 9);
-    //targets.Emplace(1, 9);
-    //targets.Emplace(2, 9);
+    targets.Emplace(1, 9);
+    targets.Emplace(2, 9);
     TArray<EikonalCellValue> eikonal = CreateEikonalSurface(bigTile, targets);
 
     for (int32 i = 0; i < 10; i++) {
