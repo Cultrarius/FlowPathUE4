@@ -115,7 +115,7 @@ void AFlowPathManager::updateDirtyPathData()
         auto connectedPortal = followingPortals ? data.waypoints[data.waypointIndex + 1] : nullptr;
 
         int32 lookupIndex = flowPath->fastFlowMapLookup({ location, target }, nextPortal, connectedPortal);
-        if (lookupIndex > 0) {
+        if (lookupIndex >= 0) {
             data.targetAcceleration = normalizedNeighbors[lookupIndex];
         } else if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
             float bestTarget = MAX_VAL;
