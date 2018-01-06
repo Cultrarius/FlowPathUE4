@@ -283,7 +283,23 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
     return{ true, wayPoints, pathCost };
 }
 
-const TArray<float>& flow::FlowTile::createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal)
+int32 toDirectionIndex(Orientation facing) {
+    if (facing == Orientation::LEFT) {
+        return 0;
+    }
+    if (facing == Orientation::BOTTOM) {
+        return 1;
+    }
+    if (facing == Orientation::RIGHT) {
+        return 2;
+    }
+    if (facing == Orientation::TOP) {
+        return 3;
+    }
+    return -1;
+}
+
+const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal)
 {
     check(targetPortal);
     check(connectedPortal);
@@ -318,10 +334,18 @@ const TArray<float>& flow::FlowTile::createMapToPortal(const Portal* targetPorta
         current += increment;
     } while (current != end);
 
-    return eikonalMaps.Add(key, createMapToTarget(targets));
+    auto resultMap = createMapToTarget(targets);
+    for (auto p : targets) {
+        // For non-portal target points the direction lookups are invalid.
+        // We change them for the portal window, so that an agent will pass to the next tile.
+        int32 index = p.X + p.Y * tileLength;
+        resultMap[index].directionLookupIndex = toDirectionIndex(targetPortal->orientation);
+    }
+
+    return eikonalMaps.Add(key, resultMap);
 }
 
-TArray<float> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)
+TArray<EikonalCellValue> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)
 {
     return CreateEikonalSurface(getData(), targets);
 }

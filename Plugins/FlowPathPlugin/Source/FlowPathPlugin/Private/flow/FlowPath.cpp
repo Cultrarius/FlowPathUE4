@@ -252,6 +252,38 @@ TArray<const Portal*> flow::FlowPath::getAllPortals() const
     return result;
 }
 
+int32 flow::FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal)
+{
+    auto& cellLocation = vector.start.pointInTile;
+    int32 cellIndex = cellLocation.X + cellLocation.Y * tileLength;
+    if (nextPortal == nullptr) {
+        check(connectedPortal == nullptr);
+        if (vector.start.tileLocation != vector.end.tileLocation) {
+            return -1;
+        }
+        // get flowmap to direct target location
+        auto tile = tileMap.Find(vector.end.tileLocation);
+        if (tile == nullptr) {
+            return -1;
+        }
+        // TODO add result caching
+        TArray<FIntPoint> targets = { vector.end.pointInTile };
+        const auto& tileFlowMap = (*tile)->createMapToTarget(targets);
+        return tileFlowMap[cellIndex].directionLookupIndex;
+    }
+    else {
+        check(connectedPortal != nullptr);
+
+        // get flowmap to target portals
+        auto tile = tileMap.Find(vector.start.tileLocation);
+        if (tile == nullptr) {
+            return -1;
+        }
+        const auto& tileFlowMap = (*tile)->createMapToPortal(nextPortal, connectedPortal);
+        return tileFlowMap[cellIndex].directionLookupIndex;
+    }
+}
+
 bool flow::FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract & result)
 {
     if (nextPortal == nullptr) {
@@ -286,10 +318,10 @@ bool flow::FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nex
     return true;
 }
 
-void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<float>& flowMap, Orientation nextPortalOrientation, FlowMapExtract & result) const
+void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<EikonalCellValue>& flowMap, Orientation nextPortalOrientation, FlowMapExtract & result) const
 {
     int32 selfIndex = p.pointInTile.X + p.pointInTile.Y * tileLength;
-    float flowVal = flowMap[selfIndex];
+    float flowVal = flowMap[selfIndex].cellValue;
     result.cellValue = flowVal;
     bool standingOnPortal = flowVal == 0 && nextPortalOrientation != Orientation::NONE;
 
@@ -299,7 +331,7 @@ void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<flo
         int32 tileDeltaY = neighbor.Y < 0 ? -1 : (neighbor.Y >= tileLength ? 1 : 0);
         if (tileDeltaX == 0 && tileDeltaY == 0) {
             int32 index = neighbor.X + neighbor.Y * tileLength;
-            result.neighborCells[i] = flowMap[index] + (standingOnPortal ? 300 : 0);
+            result.neighborCells[i] = flowMap[index].cellValue + (standingOnPortal ? 300 : 0);
         }
         else {
             // The neighbor is on another tile, so we have no flowmap for it.

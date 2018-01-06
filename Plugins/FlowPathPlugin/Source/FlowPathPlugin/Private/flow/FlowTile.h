@@ -40,6 +40,11 @@ namespace flow {
         }
     };
 
+    struct EikonalCellValue {
+        int8 directionLookupIndex;
+        float cellValue;
+    };
+
     class FlowTile {
     private:
         TArray<uint8> tileData;
@@ -47,7 +52,7 @@ namespace flow {
         FIntPoint coordinates;
         int32 tileLength;
         TArray<Portal> portals;
-        TMap<FlowPortalKey, TArray<float>> eikonalMaps;
+        TMap<FlowPortalKey, TArray<EikonalCellValue>> eikonalMaps;
 
         void initPortalData();
 
@@ -85,8 +90,8 @@ namespace flow {
 
         PathSearchResult findPath(FIntPoint start, FIntPoint end);
 
-        const TArray<float>& createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal);
+        const TArray<EikonalCellValue>& createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal);
 
-        TArray<float> createMapToTarget(const TArray<FIntPoint>& targets);
+        TArray<EikonalCellValue> createMapToTarget(const TArray<FIntPoint>& targets);
     };
 }

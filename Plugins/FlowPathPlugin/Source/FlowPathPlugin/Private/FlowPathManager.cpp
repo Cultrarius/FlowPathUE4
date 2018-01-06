@@ -114,7 +114,10 @@ void AFlowPathManager::updateDirtyPathData()
         auto nextPortal = followingPortals ? data.waypoints[data.waypointIndex] : nullptr;
         auto connectedPortal = followingPortals ? data.waypoints[data.waypointIndex + 1] : nullptr;
 
-        if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
+        int32 lookupIndex = flowPath->fastFlowMapLookup({ location, target }, nextPortal, connectedPortal);
+        if (lookupIndex > 0) {
+            data.targetAcceleration = normalizedNeighbors[lookupIndex];
+        } else if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
             float bestTarget = MAX_VAL;
             FVector2D targetDirection = FVector2D::ZeroVector;
             FVector2D agentVelocity = (data.current.agentLocation - data.lastTick.agentLocation).GetSafeNormal();

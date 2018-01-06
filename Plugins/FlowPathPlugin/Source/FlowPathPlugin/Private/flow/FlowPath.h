@@ -74,7 +74,7 @@ namespace flow {
 
         int32 calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const;
 
-        void extractPartialFlowmap(const TilePoint& p, const TArray<float>& flowMap, Orientation nextPortalOrientation, FlowMapExtract& result) const;
+        void extractPartialFlowmap(const TilePoint& p, const TArray<EikonalCellValue>& flowMap, Orientation nextPortalOrientation, FlowMapExtract& result) const;
 
     public:
         explicit FlowPath(int32 tileLength);
@@ -94,5 +94,7 @@ namespace flow {
         TArray<const Portal*> getAllPortals() const;
 
         bool getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract& result);
+
+        int32 fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal);
     };
 }

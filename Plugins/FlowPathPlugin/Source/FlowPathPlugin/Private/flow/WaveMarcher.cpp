@@ -31,7 +31,12 @@ struct Wmm {
     int8 dir = -1;
 };
 
-int32 toIndex(const FIntPoint& coordinates, int length)
+int32 toIndex(int32 x, int32 y, int32 length)
+{
+    return x + y * length;
+}
+
+int32 toIndex(const FIntPoint& coordinates, int32 length)
 {
     return coordinates.X + coordinates.Y * length;
 }
@@ -41,7 +46,7 @@ bool isValidLocation(const FIntPoint & p, int32 length)
     return p.X >= 0 && p.Y >= 0 && p.X < length && p.Y < length;
 }
 
-void setCoefficients(const float* y, float* m, int pos) {
+void setCoefficients(const float* y, float* m, int32 pos) {
     m[0] = y[pos];
     if (pos % 2 == 0) {
         m[2] = (y[(pos + 2) % 8] + y[pos] - 2.0 * y[(pos + 1) % 8]) / 2.0;
@@ -141,7 +146,7 @@ float getVal2D(const TArray<uint8>& sourceData, const TArray<WaveNode> &waveSurf
     return val;
 }
 
-TArray<float> flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FIntPoint> targetPoints)
+TArray<EikonalCellValue> flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const TArray<FIntPoint> targetPoints)
 {
     int32 length = FMath::Sqrt(sourceData.Num());
     check(length);
@@ -245,12 +250,33 @@ TArray<float> flow::CreateEikonalSurface(const TArray<uint8>& sourceData, const 
     }
 
     // copy the result to the output
-    TArray<float> output;
-    output.Reserve(sourceData.Num());
+    TArray<EikonalCellValue> output;
+    output.AddUninitialized(sourceData.Num());
     for (int32 i = 0; i < length * length; i++) {
-        WaveNode& node = waveSurface[i];
-        uint8 sourceVal = sourceData[i];
-        output.Add(sourceVal == 255 ? MAX_VAL : node.value);
+            WaveNode& node = waveSurface[i];
+            uint8 sourceVal = sourceData[i];
+            output[i].cellValue = sourceVal == 255 ? MAX_VAL : node.value;
+    }
+
+    // precompute cell directions for fast lookup
+    for (int32 y = 0; y < length ; y++) {
+        for (int32 x = 0; x < length; x++) {
+            int32 bestIndex = -1;
+            float bestValue = MAX_VAL;
+            for (int32 i = 0; i < 8; i++) {
+                int32 neighborX = x + xarray[i];
+                int32 neighborY = y + yarray[i];
+                if (neighborX >= 0 && neighborX < length && neighborY >= 0 && neighborY < length) {
+                    float val = output[toIndex(neighborX, neighborY, length)].cellValue;
+                    if (val < bestValue) {
+                        bestIndex = i;
+                        bestValue = val;
+                    }
+                }
+            }
+            int32 cellIndex = toIndex(x, y, length);
+            output[cellIndex].directionLookupIndex = output[cellIndex].cellValue == 0 ? -1 : bestIndex;
+        }
     }
     return output;
 }
