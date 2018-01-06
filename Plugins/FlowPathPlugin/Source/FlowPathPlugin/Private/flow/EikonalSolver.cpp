@@ -112,6 +112,10 @@ TArray<EikonalCellValue> flow::CreateEikonalSurface(const TArray<uint8>& sourceD
                     trialNodes.push_back(neighbor);
                 }
             }
+            else if (i < 4 && newCost == node.value) {
+                // prefer non-diagonal parents
+                node.parentDirection = reverseLookup[i];
+            }
         }
     }
 
