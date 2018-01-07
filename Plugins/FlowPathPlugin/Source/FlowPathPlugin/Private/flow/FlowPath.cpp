@@ -321,6 +321,15 @@ TArray<const Portal*> FlowPath::getAllPortals() const
     return result;
 }
 
+TMap<FIntPoint, TArray<TArray<EikonalCellValue>>> flow::FlowPath::getAllFlowMaps() const
+{
+    TMap<FIntPoint, TArray<TArray<EikonalCellValue>>> result;
+    for (auto& tile : tileMap) {
+        result.Add(tile.Key, tile.Value->getAllFlowMaps());
+    }
+    return result;
+}
+
 int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal)
 {
     auto& cellLocation = vector.start.pointInTile;

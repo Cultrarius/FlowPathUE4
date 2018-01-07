@@ -124,6 +124,8 @@ private:
 
     void DebugDrawAllPortals();
 
+    void DebugDrawFlowMaps();
+
 public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
     bool DrawAllBlockedCells;
@@ -136,6 +138,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
     bool DrawAgentPortalWaypoints;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
+    bool DrawFlowMaps;
 
 #endif		// WITH_EDITOR
 

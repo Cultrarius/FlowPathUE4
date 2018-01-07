@@ -80,6 +80,31 @@ void AFlowPathManager::DebugDrawAllPortals()
     }
 }
 
+void AFlowPathManager::DebugDrawFlowMaps()
+{
+    auto inverted = WorldToTileTransform.Inverse();
+    for (auto& pair : flowPath->getAllFlowMaps()) {
+        auto tileCoord = pair.Key;
+        for (auto& flowMap : pair.Value) {
+            for (int y = 0; y < tileLength; y++) {
+                for (int x = 0; x < tileLength; x++) {
+                    auto& val = flowMap[x + y * tileLength];
+                    int32 absoluteX = tileCoord.X * tileLength + x;
+                    int32 absoluteY = tileCoord.Y * tileLength + y;
+                    FVector2D centerPoint(absoluteX + 0.5, absoluteY + 0.5);
+                    auto tileCenter = toV3(inverted.TransformPoint(centerPoint));
+                    int32 index = val.directionLookupIndex;
+                    if (index == -1) {
+                        continue;
+                    }
+                    auto neighborDirection = toV3(inverted.TransformPoint(normalizedNeighbors[index] / 2));
+                    DrawDebugDirectionalArrow(GetWorld(), tileCenter, tileCenter + neighborDirection, 100, FColor::Purple, false, -1, 2, 4);
+                }
+            }
+        }
+    }
+}
+
 #endif		// WITH_EDITOR
 
 void AFlowPathManager::updateDirtyPathData()
@@ -285,6 +310,9 @@ void AFlowPathManager::Tick(float DeltaTime)
     }
     if (DrawAllPortals) {
         DebugDrawAllPortals();
+    }
+    if (DrawFlowMaps) {
+        DebugDrawFlowMaps();
     }
 #endif		// WITH_EDITOR
 

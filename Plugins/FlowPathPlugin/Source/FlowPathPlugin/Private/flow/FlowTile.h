@@ -93,5 +93,7 @@ namespace flow {
         const TArray<EikonalCellValue>& createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal);
 
         TArray<EikonalCellValue> createMapToTarget(const TArray<FIntPoint>& targets);
+
+        TArray<TArray<EikonalCellValue>> getAllFlowMaps() const;
     };
 }

@@ -61,9 +61,22 @@ void FFlowPathPluginModule::StartupModule()
     TilePoint searchStart = { FIntPoint(1, 1), FIntPoint(1, 0) };
     TilePoint searchEnd = { FIntPoint(2, 2), FIntPoint(1, 3) };
     PortalSearchResult portalResult = path.findPortalPath(searchStart, searchEnd);
-    UE_LOG(LogExec, Warning, TEXT("Success: %d, Cost: %d"), portalResult.success, portalResult.pathCost);
+    //TODO: test cache
+    UE_LOG(LogExec, Warning, TEXT("Success: %d"), portalResult.success);
     UE_LOG(LogExec, Warning, TEXT("Portal search [start]"));
-    for (int i = portalResult.waypoints.Num() - 1; i >= 0; i--) {
+    for (int i = 0; i < portalResult.waypoints.Num(); i++) {
+        const Portal* p = portalResult.waypoints[i];
+        UE_LOG(LogExec, Warning, TEXT("Portal waypoint %d, %d on tile %d, %d:"), p->center.X, p->center.Y, p->parentTile->getCoordinates().X, p->parentTile->getCoordinates().Y);
+    }
+    UE_LOG(LogExec, Warning, TEXT("Portal search [end]"));
+
+    UE_LOG(LogExec, Warning, TEXT("---------------------"));
+    portalResult.waypoints.RemoveAt(0, 2);
+    path.cachePortalPath(searchEnd, portalResult.waypoints);
+    portalResult = path.findPortalPath(searchStart, searchEnd);
+    UE_LOG(LogExec, Warning, TEXT("Testing cached path... Success: %d"), portalResult.success);
+    UE_LOG(LogExec, Warning, TEXT("Portal search [start]"));
+    for (int i = 0; i < portalResult.waypoints.Num(); i++) {
         const Portal* p = portalResult.waypoints[i];
         UE_LOG(LogExec, Warning, TEXT("Portal waypoint %d, %d on tile %d, %d:"), p->center.X, p->center.Y, p->parentTile->getCoordinates().X, p->parentTile->getCoordinates().Y);
     }
@@ -72,21 +85,28 @@ void FFlowPathPluginModule::StartupModule()
 
 
     TArray<uint8> bigTile = {
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 4,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 4,
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 4,
-        2, 2, 2, 2, 2, 2, 2, 2, 3, 3,
-        2, 2, 2, 2, 2, 2, 2, 2, 3, 3,
-        2, 2, 2, 2, 2, 2, 2, 2, 3, 3,
-        2, 2, 2, 2, 2, 2, 2, 2, 3, 3,
-        2, 2, 2, 255, 2, 2, 2, 2, 2, 3,
-        2, 2, 2, 255, 2, 2, 2, 2, 2, 3,
-        2, 2, 2, 255, 2, 2, 2, 2, 2, 2,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 255, 255,
+        1, 1, 1, 1, 1, 1, 1, 1, 255, 255,
+        1, 1, 1, 1, 1, 1, 1, 1, 255, 255,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1
     };
     TArray<FIntPoint> targets;
     targets.Emplace(0, 9);
     targets.Emplace(1, 9);
     targets.Emplace(2, 9);
+    targets.Emplace(3, 9);
+    targets.Emplace(4, 9);
+    targets.Emplace(5, 9);
+    targets.Emplace(6, 9);
+    targets.Emplace(7, 9);
+    targets.Emplace(8, 9);
+    targets.Emplace(9, 9);
     TArray<EikonalCellValue> eikonal = CreateEikonalSurface(bigTile, targets);
 
     for (int32 i = 0; i < 10; i++) {

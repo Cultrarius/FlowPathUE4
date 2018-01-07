@@ -329,10 +329,11 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
     FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
     FIntPoint current(startX, startY);
     FIntPoint end(endX, endY);
-    do {
+    while (current != end) {
         targets.Add(current);
         current += increment;
-    } while (current != end);
+    }
+    targets.Add(end);
 
     auto resultMap = createMapToTarget(targets);
     for (auto p : targets) {
@@ -348,6 +349,13 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
 TArray<EikonalCellValue> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)
 {
     return CreateEikonalSurface(getData(), targets);
+}
+
+TArray<TArray<EikonalCellValue>> flow::FlowTile::getAllFlowMaps() const
+{
+    TArray<TArray<EikonalCellValue>> result;
+    eikonalMaps.GenerateValueArray(result);
+    return result;
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const

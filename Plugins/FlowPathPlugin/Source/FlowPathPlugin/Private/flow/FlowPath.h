@@ -101,6 +101,8 @@ namespace flow {
 
         TArray<const Portal*> getAllPortals() const;
 
+        TMap<FIntPoint, TArray<TArray<EikonalCellValue>>> getAllFlowMaps() const;
+
         bool getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract& result);
 
         int32 fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal);
