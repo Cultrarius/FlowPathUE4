@@ -14,8 +14,13 @@ AFlowPathManager::AFlowPathManager()
     tileLength = 10;
     VelocityBonus = 0.5;
     WaypointBonus = 0.5;
-    DrawFlowMapAroundAgents = true;
-    DrawAgentPortalWaypoints = true;
+
+#if WITH_EDITOR
+    DrawAllBlockedCells = false;
+    DrawAllPortals = false;
+    DrawFlowMapAroundAgents = false;
+    DrawAgentPortalWaypoints = false;
+#endif		// WITH_EDITOR
 
     InitializeTiles();
 }
@@ -274,6 +279,15 @@ void AFlowPathManager::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
     TArray<UObject*> agentsToRemove;
 
+#if WITH_EDITOR
+    if (DrawAllBlockedCells) {
+        DebugDrawAllBlockedCells();
+    }
+    if (DrawAllPortals) {
+        DebugDrawAllPortals();
+    }
+#endif		// WITH_EDITOR
+
     for (auto& agentPair : agents) {
         UObject* agent = agentPair.Key;
         AgentData& data = agentPair.Value;
@@ -286,17 +300,24 @@ void AFlowPathManager::Tick(float DeltaTime)
 #if WITH_EDITOR
         if (DrawAgentPortalWaypoints) {
             auto inverted = WorldToTileTransform.Inverse();
-            for (int32 i = 1; i < data.waypoints.Num(); i++) {
+            if (data.waypoints.Num() > data.waypointIndex) {
+                auto& first = data.waypoints[data.waypointIndex];
+                auto& last = data.waypoints.Last();
+                FVector2D firstWaypoint = portalCoordToAbsolute(first->center, first->parentTile, tileLength) + FVector2D(0.5, 0.5);
+                FVector2D lastWaypoint = portalCoordToAbsolute(last->center, last->parentTile, tileLength) + FVector2D(0.5, 0.5);
+                DrawDebugDirectionalArrow(GetWorld(), toV3(data.current.agentLocation), toV3(inverted.TransformPoint(firstWaypoint)), 100, FColor::Red, false, -1, 2, 4);
+                DrawDebugDirectionalArrow(GetWorld(), toV3(inverted.TransformPoint(lastWaypoint)), toV3(data.current.targetLocation), 100, FColor::Red, false, -1, 2, 4);
+            }
+            for (int32 i = data.waypointIndex + 1; i < data.waypoints.Num(); i++) {
                 auto& previous = data.waypoints[i - 1];
                 auto& portal = data.waypoints[i];
 
                 // draw the portal connection in red
                 FVector2D startCenter = portalCoordToAbsolute(previous->center, previous->parentTile, tileLength) + FVector2D(0.5, 0.5);
                 FVector2D endCenter = portalCoordToAbsolute(portal->center, portal->parentTile, tileLength) + FVector2D(0.5, 0.5);
-                DrawDebugLine(GetWorld(), toV3(inverted.TransformPoint(startCenter)), toV3(inverted.TransformPoint(endCenter)), FColor::Red, false, -1, 1, 10);
+                DrawDebugDirectionalArrow(GetWorld(), toV3(inverted.TransformPoint(startCenter)), toV3(inverted.TransformPoint(endCenter)), 100, FColor::Red, false, -1, 2, 4);
             }
         }
-
 #endif		// WITH_EDITOR
 
         data.lastTick = data.current;

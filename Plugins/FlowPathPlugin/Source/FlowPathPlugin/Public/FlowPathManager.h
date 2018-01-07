@@ -119,16 +119,22 @@ public:
 
 #if WITH_EDITOR
 
-    UFUNCTION(BlueprintCallable, Category = "FlowPath")
+private:
     void DebugDrawAllBlockedCells();
 
-    UFUNCTION(BlueprintCallable, Category = "FlowPath")
-     void DebugDrawAllPortals();
+    void DebugDrawAllPortals();
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath")
+public:
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
+    bool DrawAllBlockedCells;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
+    bool DrawAllPortals;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
     bool DrawFlowMapAroundAgents;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
     bool DrawAgentPortalWaypoints;
 
 #endif		// WITH_EDITOR
