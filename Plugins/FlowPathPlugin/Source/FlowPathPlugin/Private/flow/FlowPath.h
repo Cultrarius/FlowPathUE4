@@ -89,9 +89,9 @@ namespace flow {
 
         PathSearchResult findDirectPath(FIntPoint start, FIntPoint end);
 
-        PortalSearchResult findPortalPath(const TilePoint& start, const TilePoint& end) const;
+        PortalSearchResult findPortalPath(const TilePoint& start, const TilePoint& end);
 
-        PortalSearchResult findPortalPath(const TileVector& vector) const;
+        PortalSearchResult findPortalPath(const TileVector& vector);
 
         void cachePortalPath(const TilePoint& targetKey, TArray<const Portal*> waypoints);
 

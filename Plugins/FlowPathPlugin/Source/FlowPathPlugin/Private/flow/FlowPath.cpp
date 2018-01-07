@@ -58,7 +58,7 @@ bool FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tile
     return true;
 }
 
-uint8 flow::FlowPath::getDataFor(const TilePoint & p) const
+uint8 FlowPath::getDataFor(const TilePoint & p) const
 {
     auto tile = tileMap.Find(p.tileLocation);
     if (tile == nullptr || !isValidTileLocation(p.pointInTile)) {
@@ -69,7 +69,7 @@ uint8 flow::FlowPath::getDataFor(const TilePoint & p) const
     return (*tile)->getData()[index];
 }
 
-PathSearchResult flow::FlowPath::findDirectPath(FIntPoint start, FIntPoint end)
+PathSearchResult FlowPath::findDirectPath(FIntPoint start, FIntPoint end)
 {
     return (*tileMap.Find(FIntPoint(1, 1)))->findPath(start, end);
 }
@@ -109,12 +109,12 @@ FlowTile *FlowPath::getTile(FIntPoint tileCoordinates) {
     return tile == nullptr ? nullptr : tile->Get();
 }
 
-PortalSearchResult flow::FlowPath::findPortalPath(const TileVector& vector) const
+PortalSearchResult FlowPath::findPortalPath(const TileVector& vector)
 {
     return findPortalPath(vector.start, vector.end);
 }
 
-void flow::FlowPath::cachePortalPath(const TilePoint & target, TArray<const Portal*> waypoints)
+void FlowPath::cachePortalPath(const TilePoint & target, TArray<const Portal*> waypoints)
 {
     check(waypoints.Num() % 2 == 0);
 
@@ -127,7 +127,7 @@ void flow::FlowPath::cachePortalPath(const TilePoint & target, TArray<const Port
     }
 }
 
-void flow::FlowPath::deleteFromPathCache(const TilePoint & targetKey)
+void FlowPath::deleteFromPathCache(const TilePoint & targetKey)
 {
     int32 absoluteX = targetKey.pointInTile.X + targetKey.tileLocation.X * tileLength;
     int32 absoluteY = targetKey.pointInTile.Y + targetKey.tileLocation.Y * tileLength;
@@ -137,7 +137,7 @@ void flow::FlowPath::deleteFromPathCache(const TilePoint & targetKey)
     }
 }
 
-PortalSearchResult flow::FlowPath::checkCache(const Portal* start, const FIntPoint& key) const
+PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& key) const
 {
     PortalSearchResult result;
     const CacheEntry* cacheEntry = waypointCache.Find(start);
@@ -188,7 +188,7 @@ TArray<const Portal*> createWaypoints(TMap<const Portal*, PortalSearchNode>& sea
 }
 
 
-PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const TilePoint& end) const
+PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePoint& end)
 {
     // This method conducts a modified A* search over the tile portals to find a path to the specified goal.
     // The search can merge with previous search results, which might not always lead to the optimal route,
@@ -258,6 +258,7 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
         if (frontierPortal == &endPortal) {
             result.success = true;
             result.waypoints = createWaypoints(searchedNodes, &startPortal, frontier.parentPortal);
+            cachePortalPath(end, result.waypoints);
             break;
         }
 
@@ -298,7 +299,7 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
     return result;
 }
 
-TArray<FIntPoint> flow::FlowPath::getAllValidTileCoordinates() const
+TArray<FIntPoint> FlowPath::getAllValidTileCoordinates() const
 {
     TArray<FIntPoint> result;
     for (auto& pair : tileMap) {
@@ -307,7 +308,7 @@ TArray<FIntPoint> flow::FlowPath::getAllValidTileCoordinates() const
     return result;
 }
 
-TArray<const Portal*> flow::FlowPath::getAllPortals() const
+TArray<const Portal*> FlowPath::getAllPortals() const
 {
     TArray<const Portal*> result;
 
@@ -320,7 +321,7 @@ TArray<const Portal*> flow::FlowPath::getAllPortals() const
     return result;
 }
 
-int32 flow::FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal)
+int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal)
 {
     auto& cellLocation = vector.start.pointInTile;
     int32 cellIndex = cellLocation.X + cellLocation.Y * tileLength;
@@ -352,7 +353,7 @@ int32 flow::FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* 
     }
 }
 
-bool flow::FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract & result)
+bool FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract & result)
 {
     if (nextPortal == nullptr) {
         check(connectedPortal == nullptr);
@@ -386,7 +387,7 @@ bool flow::FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nex
     return true;
 }
 
-void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<EikonalCellValue>& flowMap, Orientation nextPortalOrientation, FlowMapExtract & result) const
+void FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<EikonalCellValue>& flowMap, Orientation nextPortalOrientation, FlowMapExtract & result) const
 {
     int32 selfIndex = p.pointInTile.X + p.pointInTile.Y * tileLength;
     float flowVal = flowMap[selfIndex].cellValue;
@@ -450,12 +451,12 @@ void flow::FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<Eik
     }
 }
 
-bool flow::FlowPath::isValidTileLocation(const FIntPoint & p) const
+bool FlowPath::isValidTileLocation(const FIntPoint & p) const
 {
     return p.X >= 0 && p.Y >= 0 && p.X < tileLength && p.Y < tileLength;
 }
 
-int32 flow::FlowPath::calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const
+int32 FlowPath::calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const
 {
     // calculate the absolute distance between start and end across the tiles
     int32 startX = start.tileLocation.X * tileLength + start.pointInTile.X;
