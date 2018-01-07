@@ -274,7 +274,7 @@ PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePo
         }
 
         // if we are on the goal tile we try to reach the target point from the portal
-        if (frontierPortal->parentTile->getCoordinates() == end.tileLocation) {
+        if (frontierPortal->tileCoordinates == end.tileLocation) {
             PathSearchResult searchResult = (*endTile)->findPath(frontierPortal->center, end.pointInTile);
             if (searchResult.success) {
                 int32 nodeCost = frontier.nodeCost + searchResult.pathCost;
@@ -288,7 +288,7 @@ PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePo
         for (auto& connected : frontierPortal->connected) {
             Portal* target = connected.Key;
             int32 nodeCost = frontier.nodeCost + connected.Value;
-            TilePoint portalPoint = { target->parentTile->getCoordinates(), target->center };
+            TilePoint portalPoint = { target->tileCoordinates, target->center };
             int32 goalCost = nodeCost + calcGoalHeuristic(portalPoint, end);
             PortalSearchNode newNode = { nodeCost, goalCost, target, frontierPortal, true };
             searchQueue.HeapPush(newNode);
@@ -330,7 +330,7 @@ TMap<FIntPoint, TArray<TArray<EikonalCellValue>>> flow::FlowPath::getAllFlowMaps
     return result;
 }
 
-int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal)
+int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, const Portal* lookaheadPortal)
 {
     auto& cellLocation = vector.start.pointInTile;
     int32 cellIndex = cellLocation.X + cellLocation.Y * tileLength;
@@ -381,7 +381,7 @@ bool FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nextPorta
     }
     else {
         check(connectedPortal != nullptr);
-        if (!nextPortal->connected.Contains(connectedPortal) || vector.start.tileLocation != nextPortal->parentTile->getCoordinates()) {
+        if (!nextPortal->connected.Contains(connectedPortal) || vector.start.tileLocation != nextPortal->tileCoordinates) {
             return false;
         }
 

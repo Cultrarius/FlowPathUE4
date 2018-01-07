@@ -105,6 +105,6 @@ namespace flow {
 
         bool getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract& result);
 
-        int32 fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal);
+        int32 fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, const Portal* lookaheadPortal);
     };
 }

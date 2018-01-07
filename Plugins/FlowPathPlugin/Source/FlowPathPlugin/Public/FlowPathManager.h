@@ -78,6 +78,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     float AcceptanceRadius;
 
+    /** 
+     * If true then flowmaps can be generated with data from the tiles around them. This leads to higher quality flowmaps,
+     * but it also increases the calculation times and a flowmap becomes invalid if a neighbor tile is changed.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
+    bool LookaheadFlowmapGeneration;
+
     /** The better a target cell direction aligns with the current agent velocity, the more its value gets boosted by the bonus (ranges from -1 to 1). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     float VelocityBonus;

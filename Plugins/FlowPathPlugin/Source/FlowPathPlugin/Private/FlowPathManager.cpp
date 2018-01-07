@@ -14,6 +14,7 @@ AFlowPathManager::AFlowPathManager()
     tileLength = 10;
     VelocityBonus = 0.5;
     WaypointBonus = 0.5;
+    LookaheadFlowmapGeneration = true;
 
 #if WITH_EDITOR
     DrawAllBlockedCells = false;
@@ -121,10 +122,10 @@ void AFlowPathManager::updateDirtyPathData()
         // check and update the portal waypoint data
         bool isWaypointDataDirty = false;
         if (data.waypoints.Num() > 0 && data.waypoints.Num() > data.waypointIndex) {
-            if (data.waypoints[data.waypointIndex + 1]->parentTile->getCoordinates() == location.tileLocation) {
+            if (data.waypoints[data.waypointIndex + 1]->tileCoordinates == location.tileLocation) {
                 isWaypointDataDirty = false;
                 data.waypointIndex += 2;
-            } else if (data.waypoints[data.waypointIndex]->parentTile->getCoordinates() != location.tileLocation) {
+            } else if (data.waypoints[data.waypointIndex]->tileCoordinates != location.tileLocation) {
                 isWaypointDataDirty = true;
             }
         }
@@ -143,8 +144,9 @@ void AFlowPathManager::updateDirtyPathData()
         bool followingPortals = data.waypointIndex < data.waypoints.Num();
         auto nextPortal = followingPortals ? data.waypoints[data.waypointIndex] : nullptr;
         auto connectedPortal = followingPortals ? data.waypoints[data.waypointIndex + 1] : nullptr;
+        auto lookaheadPortal = (LookaheadFlowmapGeneration && followingPortals && data.waypoints.Num() > data.waypointIndex + 3) ? data.waypoints[data.waypointIndex + 3] : nullptr;
 
-        int32 lookupIndex = flowPath->fastFlowMapLookup({ location, target }, nextPortal, connectedPortal);
+        int32 lookupIndex = flowPath->fastFlowMapLookup({ location, target }, nextPortal, connectedPortal, lookaheadPortal);
         if (lookupIndex >= 0) {
             data.targetAcceleration = normalizedNeighbors[lookupIndex];
         } else if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
@@ -276,7 +278,7 @@ bool AFlowPathManager::findClosestWaypoint(const AgentData& data, const flow::Ti
     int32 count = data.waypoints.Num();
     if (count > index) {
         auto portal = data.waypoints[index];
-        result.tileLocation = portal->parentTile->getCoordinates();
+        result.tileLocation = portal->tileCoordinates;
         if (result.tileLocation == agentLocation.tileLocation) {
             result.pointInTile = portal->start;
             int32 bestDistance = (result.pointInTile - agentLocation.pointInTile).SizeSquared();

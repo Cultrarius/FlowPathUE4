@@ -3,6 +3,7 @@
 //
 
 #include "Portal.h"
+#include "FlowTile.h"
 
 using namespace flow;
 
@@ -12,6 +13,6 @@ flow::Portal::Portal(int32 startX, int32 startY, int32 endX, int32 endY, Orienta
 }
 
 Portal::Portal(FIntPoint start, FIntPoint end, Orientation orientation, FlowTile *parent)
-        : start(start), end(end), orientation(orientation), parentTile(parent) {
+        : start(start), end(end), orientation(orientation), parentTile(parent), tileCoordinates(parent->getCoordinates()) {
     center = (end + start) / 2;
 }

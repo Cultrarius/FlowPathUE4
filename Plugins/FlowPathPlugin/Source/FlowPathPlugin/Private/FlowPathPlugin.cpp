@@ -66,7 +66,7 @@ void FFlowPathPluginModule::StartupModule()
     UE_LOG(LogExec, Warning, TEXT("Portal search [start]"));
     for (int i = 0; i < portalResult.waypoints.Num(); i++) {
         const Portal* p = portalResult.waypoints[i];
-        UE_LOG(LogExec, Warning, TEXT("Portal waypoint %d, %d on tile %d, %d:"), p->center.X, p->center.Y, p->parentTile->getCoordinates().X, p->parentTile->getCoordinates().Y);
+        UE_LOG(LogExec, Warning, TEXT("Portal waypoint %d, %d on tile %d, %d:"), p->center.X, p->center.Y, p->tileCoordinates.X, p->tileCoordinates.Y);
     }
     UE_LOG(LogExec, Warning, TEXT("Portal search [end]"));
 
@@ -78,7 +78,7 @@ void FFlowPathPluginModule::StartupModule()
     UE_LOG(LogExec, Warning, TEXT("Portal search [start]"));
     for (int i = 0; i < portalResult.waypoints.Num(); i++) {
         const Portal* p = portalResult.waypoints[i];
-        UE_LOG(LogExec, Warning, TEXT("Portal waypoint %d, %d on tile %d, %d:"), p->center.X, p->center.Y, p->parentTile->getCoordinates().X, p->parentTile->getCoordinates().Y);
+        UE_LOG(LogExec, Warning, TEXT("Portal waypoint %d, %d on tile %d, %d:"), p->center.X, p->center.Y, p->tileCoordinates.X, p->tileCoordinates.Y);
     }
     UE_LOG(LogExec, Warning, TEXT("Portal search [end]"));
     UE_LOG(LogExec, Warning, TEXT("---------------------"));

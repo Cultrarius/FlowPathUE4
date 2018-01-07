@@ -20,6 +20,7 @@ namespace flow {
         Orientation orientation;
         TMap<Portal *, int32> connected;
         FlowTile *parentTile;
+        FIntPoint tileCoordinates;
 
         Portal(int32 startX, int32 startY, int32 endX, int32 endY, Orientation orientation, FlowTile *parentTile);
 
