@@ -7,6 +7,8 @@
 #include "FlowTile.h"
 
 namespace flow {
+
+    typedef TMap<FIntPoint, TUniquePtr<FlowTile>> TileMap;
     
     struct Agent {
         FVector2D acceleration;
@@ -35,9 +37,8 @@ namespace flow {
     };
 
     struct PortalSearchResult {
-        bool success;
+        bool success = false;
         TArray<const Portal*> waypoints;
-        int32 pathCost;
     };
 
     struct TilePoint {
@@ -55,13 +56,17 @@ namespace flow {
         float neighborCells[8];
     };
 
+    typedef TMap<FIntPoint, const Portal*> CacheEntry;
+    typedef TMap<const Portal*, CacheEntry> WaypointCache;
+
     class FlowPath {
     private:
         TArray<uint8> emptyTileData;
         TArray<uint8> fullTileData;
 
         int32 tileLength;
-        TMap<FIntPoint, TUniquePtr<FlowTile>> tileMap;
+        TileMap tileMap;
+        WaypointCache waypointCache;
 
         void updatePortals(FIntPoint tileCoordinates);
 
@@ -72,6 +77,8 @@ namespace flow {
         int32 calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const;
 
         void extractPartialFlowmap(const TilePoint& p, const TArray<EikonalCellValue>& flowMap, Orientation nextPortalOrientation, FlowMapExtract& result) const;
+
+        PortalSearchResult checkCache(const Portal* start, const FIntPoint& absoluteTarget) const;
 
     public:
         explicit FlowPath(int32 tileLength);
@@ -85,6 +92,10 @@ namespace flow {
         PortalSearchResult findPortalPath(const TilePoint& start, const TilePoint& end) const;
 
         PortalSearchResult findPortalPath(const TileVector& vector) const;
+
+        void cachePortalPath(const TilePoint& targetKey, TArray<const Portal*> waypoints);
+
+        void deleteFromPathCache(const TilePoint& targetKey);
 
         TArray<FIntPoint> getAllValidTileCoordinates() const;
 

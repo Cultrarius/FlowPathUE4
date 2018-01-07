@@ -114,14 +114,94 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TileVector& vector) cons
     return findPortalPath(vector.start, vector.end);
 }
 
+void flow::FlowPath::cachePortalPath(const TilePoint & target, TArray<const Portal*> waypoints)
+{
+    check(waypoints.Num() % 2 == 0);
+
+    int32 absoluteX = target.pointInTile.X + target.tileLocation.X * tileLength;
+    int32 absoluteY = target.pointInTile.Y + target.tileLocation.Y * tileLength;
+    for (int i = 0; i < waypoints.Num(); i++) {
+        auto portal = waypoints[i];
+        auto nextPortal = (i == waypoints.Num() - 1) ? nullptr : waypoints[i + 1];
+        waypointCache.FindOrAdd(portal).Add({ absoluteX , absoluteY }, nextPortal);
+    }
+}
+
+void flow::FlowPath::deleteFromPathCache(const TilePoint & targetKey)
+{
+    int32 absoluteX = targetKey.pointInTile.X + targetKey.tileLocation.X * tileLength;
+    int32 absoluteY = targetKey.pointInTile.Y + targetKey.tileLocation.Y * tileLength;
+    FIntPoint key(absoluteX, absoluteY);
+    for (auto& cacheEntry : waypointCache) {
+        cacheEntry.Value.Remove(key);
+    }
+}
+
+PortalSearchResult flow::FlowPath::checkCache(const Portal* start, const FIntPoint& key) const
+{
+    PortalSearchResult result;
+    const CacheEntry* cacheEntry = waypointCache.Find(start);
+    if (cacheEntry == nullptr) {
+        return result;
+    }
+    
+    if (cacheEntry->Contains(key)) {
+        result.success = true;
+        for (int i = 0; i < 100000; i++) {
+            result.waypoints.Add(start);
+            start = (*cacheEntry)[key];
+            if (start == nullptr) {
+                return result;
+            }
+            cacheEntry = waypointCache.Find(start);
+        }
+        result.success = false;
+        ensureMsgf(false, TEXT("Waypoint cache loop count too big; trying to reach target cell (%d, %d)"), key.X, key.Y);
+    }
+    return result;
+}
+
+TArray<const Portal*> createWaypoints(TMap<const Portal*, PortalSearchNode>& searchedNodes, const Portal* startPortal, const Portal* lastPortal) {
+    // create waypoints from the portals jumped from start to end
+    TArray<const Portal*> allWaypoints;
+    PortalSearchNode frontier = searchedNodes[lastPortal];
+    while (frontier.nodePortal != startPortal) {
+        allWaypoints.Add(frontier.nodePortal);
+        frontier = searchedNodes[frontier.parentPortal];
+    }
+
+    // reverse the waypoint order and remove unnecessary waypoint-jumps inside the same tile
+    TArray<const Portal*> waypoints;
+    const Portal* lastWaypoint = nullptr;
+    for (int i = allWaypoints.Num() - 1; i >= 0; i--) {
+        auto waypoint = allWaypoints[i];
+        if (lastWaypoint == nullptr || lastWaypoint->parentTile == waypoint->parentTile) {
+            lastWaypoint = waypoint;
+        }
+        else {
+            waypoints.Add(lastWaypoint);
+            waypoints.Add(waypoint);
+            lastWaypoint = nullptr;
+        }
+    }
+    return waypoints;
+}
+
+
 PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const TilePoint& end) const
 {
-    TArray<const Portal*> waypoints;
-    PortalSearchResult result = {false, waypoints, 0};
+    // This method conducts a modified A* search over the tile portals to find a path to the specified goal.
+    // The search can merge with previous search results, which might not always lead to the optimal route,
+    // but it speeds up searches from different start cells to the same target and tends to keep groups together.
+
+    PortalSearchResult result;
     auto startTile = tileMap.Find(start.tileLocation);
     auto endTile = tileMap.Find(end.tileLocation);
     FIntPoint startPoint = start.pointInTile;
     FIntPoint endPoint = end.pointInTile;
+    int32 absoluteEndX = endPoint.X + end.tileLocation.X * tileLength;
+    int32 absoluteEndY = endPoint.Y + end.tileLocation.Y * tileLength;
+    FIntPoint absoluteEnd(absoluteEndX, absoluteEndY);
 
     // sanity checks
     if (startTile == nullptr || endTile == nullptr || !isValidTileLocation(startPoint) || !isValidTileLocation(endPoint) ||
@@ -134,7 +214,6 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
         PathSearchResult directPath = (*startTile)->findPath(start.pointInTile, end.pointInTile);
         if (directPath.success) {
             result.success = true;
-            result.pathCost = directPath.pathCost;
             return result;
         }
     }
@@ -150,6 +229,10 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
     for (auto& portal : (*startTile)->getPortals()) {
         PathSearchResult searchResult = (*startTile)->findPath(startPoint, portal.center);
         if (searchResult.success) {
+            PortalSearchResult cacheResult = checkCache(&portal, absoluteEnd);
+            if (cacheResult.success) {
+                return cacheResult;
+            }
             TilePoint portalPoint = {start.tileLocation, portal.center};
             int32 goalCost = searchResult.pathCost + calcGoalHeuristic(portalPoint, end);
             PortalSearchNode newNode = {searchResult.pathCost, goalCost, &portal, &startPortal, true};
@@ -158,54 +241,39 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
         }
     }
 
-    int32 hops = 0;
     TMap<const Portal*, PortalSearchNode> searchedNodes;
     searchedNodes.Add(&startPortal, startNode);
     PortalSearchNode frontier;
     while (searchQueue.Num() > 0) {
         searchQueue.HeapPop(frontier, false);
         frontier.open = false;
-        if (searchedNodes.Contains(frontier.nodePortal)) {
+        auto frontierPortal = frontier.nodePortal;
+        if (searchedNodes.Contains(frontierPortal)) {
             // we have already searched this portal node
             continue;
         }
-        hops++;
-        searchedNodes.Add(frontier.nodePortal, frontier);
-        auto nP = frontier.nodePortal;
+        searchedNodes.Add(frontierPortal, frontier);
         
         // check to see if we have reached the goal
-        if (frontier.nodePortal == &endPortal) {
+        if (frontierPortal == &endPortal) {
             result.success = true;
-            result.pathCost = frontier.nodeCost;
+            result.waypoints = createWaypoints(searchedNodes, &startPortal, frontier.parentPortal);
+            break;
+        }
 
-            // create waypoints from the portals jumped from start to end
-            TArray<const Portal*> allWaypoints;
-            frontier = searchedNodes[frontier.parentPortal];
-            while (frontier.nodePortal != &startPortal) {
-                allWaypoints.Add(frontier.nodePortal);
-                frontier = searchedNodes[frontier.parentPortal];
+        // check the cache to merge with previous queries
+        PortalSearchResult cacheResult = checkCache(frontierPortal, absoluteEnd);
+        if (cacheResult.success) {
+            result.waypoints = createWaypoints(searchedNodes, &startPortal, frontierPortal);
+            if (result.waypoints.Num() > 0 && result.waypoints.Last() == frontierPortal) {
+                result.waypoints.Pop();
             }
-            
-            // reverse the waypoint order and remove unnecessary waypoint-jumps inside the same tile
-            const Portal* lastWaypoint = nullptr;
-            for (int i = allWaypoints.Num() - 1; i >= 0; i--) {
-                auto waypoint = allWaypoints[i];
-                if (lastWaypoint == nullptr || lastWaypoint->parentTile == waypoint->parentTile) {
-                    lastWaypoint = waypoint;
-                }
-                else {
-                    waypoints.Add(lastWaypoint);
-                    waypoints.Add(waypoint);
-                    lastWaypoint = nullptr;
-                }
-            }
-            result.waypoints = waypoints;
+            result.waypoints.Append(cacheResult.waypoints);
             break;
         }
 
         // if we are on the goal tile we try to reach the target point from the portal
-        auto frontierPortal = frontier.nodePortal;
-        if (frontier.nodePortal->parentTile->getCoordinates() == end.tileLocation) {
+        if (frontierPortal->parentTile->getCoordinates() == end.tileLocation) {
             PathSearchResult searchResult = (*endTile)->findPath(frontierPortal->center, end.pointInTile);
             if (searchResult.success) {
                 int32 nodeCost = frontier.nodeCost + searchResult.pathCost;
@@ -216,7 +284,7 @@ PortalSearchResult flow::FlowPath::findPortalPath(const TilePoint& start, const 
         }
 
         // check connected portals to reach the goal tile
-        for (auto& connected : frontier.nodePortal->connected) {
+        for (auto& connected : frontierPortal->connected) {
             Portal* target = connected.Key;
             int32 nodeCost = frontier.nodeCost + connected.Value;
             TilePoint portalPoint = { target->parentTile->getCoordinates(), target->center };
