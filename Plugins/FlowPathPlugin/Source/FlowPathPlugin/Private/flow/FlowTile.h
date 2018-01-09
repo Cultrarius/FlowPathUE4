@@ -8,6 +8,9 @@
 #include "Portal.h"
 #include <functional>
 
+//For UE4 Profiler ~ Stat Group
+DECLARE_STATS_GROUP(TEXT("FlowPath"), STATGROUP_FlowPath, STATCAT_Advanced);
+
 namespace flow {
 
     struct AStarTile {

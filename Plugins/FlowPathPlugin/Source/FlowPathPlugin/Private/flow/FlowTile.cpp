@@ -7,6 +7,12 @@
 #include "FlowPath.h"
 #include "EikonalSolver.h"
 
+//For UE4 Profiler ~ Stat
+DECLARE_CYCLE_STAT(TEXT("FlowPath tile ~ initialization"), STAT_TileInit, STATGROUP_FlowPath);
+DECLARE_CYCLE_STAT(TEXT("FlowPath tile ~ find inner path"), STAT_TileInnerPath, STATGROUP_FlowPath); 
+DECLARE_CYCLE_STAT(TEXT("FlowPath tile ~ create flow field"), STAT_TilePortalFlowmap, STATGROUP_FlowPath);
+DECLARE_CYCLE_STAT(TEXT("FlowPath tile ~ create lookahead flow field"), STAT_TilePortalLookaheadFlowmap, STATGROUP_FlowPath);
+
 using namespace std;
 using namespace flow;
 
@@ -31,6 +37,8 @@ flow::FlowTile::FlowTile(TArray<uint8>* fixedTileData, int32 tileLength, FIntPoi
 
 void flow::FlowTile::initPortalData()
 {
+    SCOPE_CYCLE_COUNTER(STAT_TileInit);
+
     auto& data = getData();
     int32 maxIndex = tileLength - 1;
 
@@ -230,57 +238,61 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         return { true, wayPoints, 0 };
     }
 
-    // do an improved A* search
-    // inspired by https://www.gamasutra.com/view/feature/131505/toward_more_realistic_pathfinding.php
+    {
+        SCOPE_CYCLE_COUNTER(STAT_TileInnerPath);
 
-    int32 tileSize = tileLength * tileLength;
-    TArray<bool> initializedTiles;
-    initializedTiles.AddZeroed(tileSize);
-    TArray<AStarTile> tiles;
-    tiles.AddUninitialized(tileSize);
+        // do an improved A* search
+        // inspired by https://www.gamasutra.com/view/feature/131505/toward_more_realistic_pathfinding.php
 
-    int32 goalIndex = toIndex(end);
-    int32 startIndex = toIndex(start);
-    
-    tiles[startIndex].pointCost = 0;
-    initializedTiles[startIndex] = true;
-    tiles[startIndex].location = start;
-    tiles[startIndex].goalCost = distance(start, end);
-    tiles[startIndex].open = false;
+        int32 tileSize = tileLength * tileLength;
+        TArray<bool> initializedTiles;
+        initializedTiles.AddZeroed(tileSize);
+        TArray<AStarTile> tiles;
+        tiles.AddUninitialized(tileSize);
 
-    FIntPoint frontier = start;
-    do {
-        initializeFrontier(frontier, initializedTiles, tiles, end);
-        int32 frontierCost = -1;
+        int32 goalIndex = toIndex(end);
+        int32 startIndex = toIndex(start);
 
-        // TODO maintain linked list for faster open node search
-        for (int y = 0; y < tileLength; y++) {
-            for (int x = 0; x < tileLength; x++) {
-                int32 i = toIndex(x, y);
-                if (initializedTiles[i] && tiles[i].open && (frontierCost < 0 || frontierCost > tiles[i].goalCost)) {
-                    frontier.X = x;
-                    frontier.Y = y;
-                    frontierCost = tiles[i].goalCost;
+        tiles[startIndex].pointCost = 0;
+        initializedTiles[startIndex] = true;
+        tiles[startIndex].location = start;
+        tiles[startIndex].goalCost = distance(start, end);
+        tiles[startIndex].open = false;
+
+        FIntPoint frontier = start;
+        do {
+            initializeFrontier(frontier, initializedTiles, tiles, end);
+            int32 frontierCost = -1;
+
+            // TODO maintain linked list for faster open node search
+            for (int y = 0; y < tileLength; y++) {
+                for (int x = 0; x < tileLength; x++) {
+                    int32 i = toIndex(x, y);
+                    if (initializedTiles[i] && tiles[i].open && (frontierCost < 0 || frontierCost > tiles[i].goalCost)) {
+                        frontier.X = x;
+                        frontier.Y = y;
+                        frontierCost = tiles[i].goalCost;
+                    }
                 }
             }
-        }
 
-        if (frontierCost == -1) {
-            return{ false, wayPoints, 0 };
-        }
-    } while (frontier != end);
+            if (frontierCost == -1) {
+                return{ false, wayPoints, 0 };
+            }
+        } while (frontier != end);
 
-    // TODO add waypoint smoothing?
-    int32 pathCost = getData(start);
-    while (frontier != start) {
-        wayPoints.Add(frontier);
-        int32 tileIndex = toIndex(frontier);
-        pathCost += getData()[tileIndex];
-        frontier = tiles[tileIndex].parentTile;
+        // TODO add waypoint smoothing?
+        int32 pathCost = getData(start);
+        while (frontier != start) {
+            wayPoints.Add(frontier);
+            int32 tileIndex = toIndex(frontier);
+            pathCost += getData()[tileIndex];
+            frontier = tiles[tileIndex].parentTile;
+        }
+        wayPoints.Add(start);
+
+        return{ true, wayPoints, pathCost };
     }
-    wayPoints.Add(start);
-    
-    return{ true, wayPoints, pathCost };
 }
 
 int32 toDirectionIndex(Orientation facing) {
@@ -308,42 +320,46 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
     if (eikonalMaps.Contains(key)) {
         return eikonalMaps[key];
     }
-    TArray<FIntPoint> targets;
+    {
+        SCOPE_CYCLE_COUNTER(STAT_TilePortalFlowmap);
 
-    // only use points shared by both portals
-    int32 startX = targetPortal->start.X;
-    int32 startY = targetPortal->start.Y;
-    int32 endX = targetPortal->end.X;    
-    int32 endY = targetPortal->end.Y;
-    if (targetPortal->orientation == Orientation::LEFT || targetPortal->orientation == Orientation::RIGHT) {
-        startY = max(connectedPortal->start.Y, startY);
-        endY = min(connectedPortal->end.Y, endY);
-    }
-    if (targetPortal->orientation == Orientation::TOP || targetPortal->orientation == Orientation::BOTTOM) {
-        startX = max(connectedPortal->start.X, startX);
-        endX = min(connectedPortal->end.X, endX);
-    }
-    check(startX <= endX);
-    check(startY <= endY);
+        TArray<FIntPoint> targets;
 
-    FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
-    FIntPoint current(startX, startY);
-    FIntPoint end(endX, endY);
-    while (current != end) {
-        targets.Add(current);
-        current += increment;
-    }
-    targets.Add(end);
+        // only use points shared by both portals
+        int32 startX = targetPortal->start.X;
+        int32 startY = targetPortal->start.Y;
+        int32 endX = targetPortal->end.X;
+        int32 endY = targetPortal->end.Y;
+        if (targetPortal->orientation == Orientation::LEFT || targetPortal->orientation == Orientation::RIGHT) {
+            startY = max(connectedPortal->start.Y, startY);
+            endY = min(connectedPortal->end.Y, endY);
+        }
+        if (targetPortal->orientation == Orientation::TOP || targetPortal->orientation == Orientation::BOTTOM) {
+            startX = max(connectedPortal->start.X, startX);
+            endX = min(connectedPortal->end.X, endX);
+        }
+        check(startX <= endX);
+        check(startY <= endY);
 
-    auto resultMap = createMapToTarget(targets);
-    for (auto p : targets) {
-        // For non-portal target points the direction lookups are invalid.
-        // We change them for the portal window, so that an agent will pass to the next tile.
-        int32 index = p.X + p.Y * tileLength;
-        resultMap[index].directionLookupIndex = toDirectionIndex(targetPortal->orientation);
-    }
+        FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
+        FIntPoint current(startX, startY);
+        FIntPoint end(endX, endY);
+        while (current != end) {
+            targets.Add(current);
+            current += increment;
+        }
+        targets.Add(end);
 
-    return eikonalMaps.Add(key, resultMap);
+        auto resultMap = createMapToTarget(targets);
+        for (auto p : targets) {
+            // For non-portal target points the direction lookups are invalid.
+            // We change them for the portal window, so that an agent will pass to the next tile.
+            int32 index = p.X + p.Y * tileLength;
+            resultMap[index].directionLookupIndex = toDirectionIndex(targetPortal->orientation);
+        }
+
+        return eikonalMaps.Add(key, resultMap);
+    }
 }
 
 
@@ -356,54 +372,58 @@ const TArray<EikonalCellValue>& flow::FlowTile::createLookaheadFlowmap(const Por
     if (eikonalMaps.Contains(key)) {
         return eikonalMaps[key];
     }
-    auto delta = lookaheadPortal->tileCoordinates - targetPortal->tileCoordinates;
-    bool lookahead = delta.X != 0 && delta.Y != 0;
-    
-    // gather the data
-    TArray<uint8> bigTileData;
-    dataProvider(bigTileData);
-    check(bigTileData.Num() == tileLength * tileLength * 4);
 
-    /*
-    char buffer[100];
-    for (int32 i = 0; i < 20; i++) {
-        uint8* v = &bigTileData[i * 20];
-        sprintf(buffer, "%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d", v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19]);
-        UE_LOG(LogExec, Warning, TEXT("%s"), *FString(ANSI_TO_TCHAR(buffer)));
-    }
-    */
+    {
+        SCOPE_CYCLE_COUNTER(STAT_TilePortalLookaheadFlowmap);
+        auto delta = lookaheadPortal->tileCoordinates - targetPortal->tileCoordinates;
+        bool lookahead = delta.X != 0 && delta.Y != 0;
 
-    // use all points from the lookahead portal as targets
-    TArray<FIntPoint> targets;
-    int32 deltaX = delta.X == 1 ? tileLength : 0;
-    int32 deltaY = delta.Y == 1 ? tileLength : 0;
-    int32 startX = lookaheadPortal->start.X + deltaX;
-    int32 startY = lookaheadPortal->start.Y + deltaY;
-    int32 endX = lookaheadPortal->end.X + deltaX;
-    int32 endY = lookaheadPortal->end.Y + deltaY;
+        // gather the data
+        TArray<uint8> bigTileData;
+        dataProvider(bigTileData);
+        check(bigTileData.Num() == tileLength * tileLength * 4);
 
-    FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
-    FIntPoint current(startX, startY);
-    FIntPoint end(endX, endY);
-    while (current != end) {
-        targets.Add(current);
-        current += increment;
-    }
-    targets.Add(end);
-
-    // create the map, then extract the original tile from it (discard the rest of the flowmap)
-    auto resultMap = CreateEikonalSurface(bigTileData, targets);
-    TArray<EikonalCellValue> extractedMap;
-    extractedMap.AddUninitialized(tileLength * tileLength);
-    for (int32 y = 0; y < tileLength; y++) {
-        for (int32 x = 0; x < tileLength; x++) {
-            int32 sourceIndex = toFourTileIndex(delta.X == -1, delta.Y == -1, x, y, tileLength);
-            int32 targetIndex = x + y * tileLength;
-            extractedMap[targetIndex] = resultMap[sourceIndex];
+        /*
+        char buffer[100];
+        for (int32 i = 0; i < 20; i++) {
+            uint8* v = &bigTileData[i * 20];
+            sprintf(buffer, "%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d", v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19]);
+            UE_LOG(LogExec, Warning, TEXT("%s"), *FString(ANSI_TO_TCHAR(buffer)));
         }
-    }
+        */
 
-    return eikonalMaps.Add(key, extractedMap);
+        // use all points from the lookahead portal as targets
+        TArray<FIntPoint> targets;
+        int32 deltaX = delta.X == 1 ? tileLength : 0;
+        int32 deltaY = delta.Y == 1 ? tileLength : 0;
+        int32 startX = lookaheadPortal->start.X + deltaX;
+        int32 startY = lookaheadPortal->start.Y + deltaY;
+        int32 endX = lookaheadPortal->end.X + deltaX;
+        int32 endY = lookaheadPortal->end.Y + deltaY;
+
+        FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
+        FIntPoint current(startX, startY);
+        FIntPoint end(endX, endY);
+        while (current != end) {
+            targets.Add(current);
+            current += increment;
+        }
+        targets.Add(end);
+
+        // create the map, then extract the original tile from it (discard the rest of the flowmap)
+        auto resultMap = CreateEikonalSurface(bigTileData, targets);
+        TArray<EikonalCellValue> extractedMap;
+        extractedMap.AddUninitialized(tileLength * tileLength);
+        for (int32 y = 0; y < tileLength; y++) {
+            for (int32 x = 0; x < tileLength; x++) {
+                int32 sourceIndex = toFourTileIndex(delta.X == -1, delta.Y == -1, x, y, tileLength);
+                int32 targetIndex = x + y * tileLength;
+                extractedMap[targetIndex] = resultMap[sourceIndex];
+            }
+        }
+
+        return eikonalMaps.Add(key, extractedMap);
+    }
 }
 
 TArray<EikonalCellValue> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)

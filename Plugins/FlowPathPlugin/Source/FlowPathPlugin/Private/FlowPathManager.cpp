@@ -4,6 +4,10 @@
 #include "DrawDebugHelpers.h"
 #include "flow/EikonalSolver.h"
 
+DECLARE_CYCLE_STAT(TEXT("FlowPath manager ~ tick"), STAT_ManagerTick, STATGROUP_FlowPath); 
+DECLARE_CYCLE_STAT(TEXT("FlowPath manager ~ update data from texture"), STAT_ManagerUpdateFromTexture, STATGROUP_FlowPath);
+DECLARE_CYCLE_STAT(TEXT("FlowPath manager ~ update dirty path data"), STAT_ManagerDirtyPaths, STATGROUP_FlowPath);
+
 using namespace flow;
 
 AFlowPathManager::AFlowPathManager()
@@ -111,6 +115,8 @@ void AFlowPathManager::DebugDrawFlowMaps()
 
 void AFlowPathManager::updateDirtyPathData()
 {
+    SCOPE_CYCLE_COUNTER(STAT_ManagerDirtyPaths);
+
     FlowMapExtract flowMap;
     for (auto& agentPair : agents) {
         AgentData& data = agentPair.Value;
@@ -308,6 +314,8 @@ bool AFlowPathManager::findClosestWaypoint(const AgentData& data, const flow::Ti
 
 void AFlowPathManager::Tick(float DeltaTime)
 {
+    SCOPE_CYCLE_COUNTER(STAT_ManagerTick);
+
     Super::Tick(DeltaTime);
     TArray<UObject*> agentsToRemove;
 
@@ -408,6 +416,8 @@ bool AFlowPathManager::UpdateMapTileLocal(int32 tileX, int32 tileY, const TArray
 
 bool AFlowPathManager::UpdateMapTilesFromTexture(int32 tileXUpperLeft, int32 tileYUpperLeft, UTexture2D* texture)
 {
+    SCOPE_CYCLE_COUNTER(STAT_ManagerUpdateFromTexture);
+
     if (texture == nullptr || texture->PlatformData == nullptr) {
         return false;
     }
