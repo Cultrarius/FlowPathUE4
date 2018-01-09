@@ -100,7 +100,7 @@ TArray<EikonalCellValue> flow::CreateEikonalSurface(const TArray<uint8>& sourceD
                 if (nextNode1.surfaceCost == BLOCKED || nextNode2.surfaceCost == BLOCKED) {
                     continue;
                 }
-                newCost = centerValue + node.surfaceCost + (nextNode1.surfaceCost + nextNode2.surfaceCost) / 4;
+                newCost = centerValue + node.surfaceCost + (nextNode1.surfaceCost + nextNode2.surfaceCost) / 4.0f;
             }
 
             // Update with new value
