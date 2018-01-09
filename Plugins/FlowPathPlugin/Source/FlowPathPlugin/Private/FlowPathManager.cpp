@@ -145,6 +145,10 @@ void AFlowPathManager::updateDirtyPathData()
         auto nextPortal = followingPortals ? data.waypoints[data.waypointIndex] : nullptr;
         auto connectedPortal = followingPortals ? data.waypoints[data.waypointIndex + 1] : nullptr;
         auto lookaheadPortal = (LookaheadFlowmapGeneration && followingPortals && data.waypoints.Num() > data.waypointIndex + 3) ? data.waypoints[data.waypointIndex + 3] : nullptr;
+        if (lookaheadPortal != nullptr && data.waypoints.Num() > data.waypointIndex + 4 && data.waypoints[data.waypointIndex + 4]->tileCoordinates == lookaheadPortal->tileCoordinates) {
+            // if possible, jump ahead even more
+            lookaheadPortal = data.waypoints[data.waypointIndex + 4];
+        }
 
         int32 lookupIndex = flowPath->fastFlowMapLookup({ location, target }, nextPortal, connectedPortal, lookaheadPortal);
         if (lookupIndex >= 0) {

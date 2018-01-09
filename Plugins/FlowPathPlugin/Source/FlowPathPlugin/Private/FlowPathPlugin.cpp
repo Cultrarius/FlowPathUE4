@@ -10,8 +10,9 @@ using namespace flow;
 
 void FFlowPathPluginModule::StartupModule()
 {
+    return;
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
-
+    
     FlowPath path(4);
     TArray<uint8> tile11 = {
         1, 1, 1, 1,
@@ -82,8 +83,7 @@ void FFlowPathPluginModule::StartupModule()
     }
     UE_LOG(LogExec, Warning, TEXT("Portal search [end]"));
     UE_LOG(LogExec, Warning, TEXT("---------------------"));
-
-
+    
     TArray<uint8> bigTile = {
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 255, 255,

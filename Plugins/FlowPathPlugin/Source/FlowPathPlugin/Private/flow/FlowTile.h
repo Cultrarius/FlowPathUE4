@@ -6,6 +6,7 @@
 
 #include "CoreMinimal.h"
 #include "Portal.h"
+#include <functional>
 
 namespace flow {
 
@@ -39,6 +40,8 @@ namespace flow {
             return PointerHash(Other.targetPortal, PointerHash(Other.connectedPortal));
         }
     };
+
+    int32 toFourTileIndex(bool isRight, bool isDown, int32 x, int32 y, int32 tileLength);
 
     struct EikonalCellValue {
         int8 directionLookupIndex;
@@ -91,6 +94,8 @@ namespace flow {
         PathSearchResult findPath(FIntPoint start, FIntPoint end);
 
         const TArray<EikonalCellValue>& createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal);
+
+        const TArray<EikonalCellValue>& createLookaheadFlowmap(const Portal* targetPortal, const Portal* lookaheadPortal, std::function<void(TArray<uint8>&)> dataProvider);
 
         TArray<EikonalCellValue> createMapToTarget(const TArray<FIntPoint>& targets);
 

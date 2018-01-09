@@ -147,10 +147,17 @@ PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& ke
     
     if (cacheEntry->Contains(key)) {
         result.success = true;
-        for (int i = 0; i < 100000; i++) {
+        auto nextPortal = (*cacheEntry)[key];
+        if (nextPortal != nullptr && nextPortal->tileCoordinates == start->tileCoordinates) {
+            start = nextPortal;
+            cacheEntry = waypointCache.Find(start);
+        }
+        
+        for (int i = 0; i < 100000; i++) { // just a guard against faulty data
             result.waypoints.Add(start);
             start = (*cacheEntry)[key];
             if (start == nullptr) {
+                check(result.waypoints.Num() % 2 == 0);
                 return result;
             }
             cacheEntry = waypointCache.Find(start);
@@ -266,10 +273,11 @@ PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePo
         PortalSearchResult cacheResult = checkCache(frontierPortal, absoluteEnd);
         if (cacheResult.success) {
             result.waypoints = createWaypoints(searchedNodes, &startPortal, frontierPortal);
-            if (result.waypoints.Num() > 0 && result.waypoints.Last() == frontierPortal) {
+            if (result.waypoints.Num() > 0 && result.waypoints.Last() == cacheResult.waypoints[0]) {
                 result.waypoints.Pop();
             }
             result.waypoints.Append(cacheResult.waypoints);
+            cachePortalPath(end, result.waypoints);
             break;
         }
 
@@ -345,6 +353,7 @@ int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPo
             return -1;
         }
         // TODO add result caching
+        // TODO add lookahead if target tile is diagonal start tile
         TArray<FIntPoint> targets = { vector.end.pointInTile };
         const auto& tileFlowMap = (*tile)->createMapToTarget(targets);
         return tileFlowMap[cellIndex].directionLookupIndex;
@@ -357,7 +366,36 @@ int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPo
         if (tile == nullptr) {
             return -1;
         }
-        const auto& tileFlowMap = (*tile)->createMapToPortal(nextPortal, connectedPortal);
+
+        auto delta = lookaheadPortal == nullptr ? FIntPoint::ZeroValue : lookaheadPortal->tileCoordinates - vector.start.tileLocation;
+        if (delta.SizeSquared() != 2) {
+            auto& tileFlowMap = (*tile)->createMapToPortal(nextPortal, connectedPortal);
+            return tileFlowMap[cellIndex].directionLookupIndex;
+        }
+        auto dataProvider = [this, &vector, &delta](TArray<uint8>& data) {
+            // only create the data when necessary, as the tile might have already cached the flowmap result
+            data.AddUninitialized(tileLength * tileLength * 4);
+            
+            for (int32 i = 0; i < 4; i++) {
+                bool xFactor = xFactorArray[i];
+                bool yFactor = yFactorArray[i];
+                bool isRight = (delta.X == 1) == xFactor;
+                bool isDown = (delta.Y == 1) == yFactor;
+                int32 deltaX = delta.X * (xFactor ? 1 : 0);
+                int32 deltaY = delta.Y * (yFactor ? 1 : 0);                        
+
+                auto tile = tileMap.Find(vector.start.tileLocation + FIntPoint(deltaX, deltaY));
+                auto& tileData = tile == nullptr ? fullTileData : (*tile)->getData();                
+                for (int32 y = 0; y < tileLength; y++) {
+                    for (int32 x = 0; x < tileLength; x++) {
+                        int32 sourceIndex = x + y * tileLength;                                    
+                        int32 targetIndex = toFourTileIndex(isRight, isDown, x, y, tileLength);
+                        data[targetIndex] = tileData[sourceIndex];
+                    }
+                }
+            }
+        };
+        auto& tileFlowMap = (*tile)->createLookaheadFlowmap(nextPortal, lookaheadPortal, dataProvider);
         return tileFlowMap[cellIndex].directionLookupIndex;
     }
 }

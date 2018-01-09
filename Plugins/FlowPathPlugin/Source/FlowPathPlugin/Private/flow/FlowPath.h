@@ -8,6 +8,8 @@
 
 namespace flow {
 
+    const bool xFactorArray[4] = { false, true, false, true };
+    const bool yFactorArray[4] = { false, false, true, true };
     typedef TMap<FIntPoint, TUniquePtr<FlowTile>> TileMap;
     
     struct Agent {
