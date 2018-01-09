@@ -9,12 +9,13 @@ using namespace flow;
 AFlowPathManager::AFlowPathManager()
 {
     PrimaryActorTick.bCanEverTick = true;
-    WorldToTileScale = FVector2D(0.1f, 0.1f);
+    WorldToTileScale = FVector2D(0.01f, 0.01f);
     AcceptanceRadius = 10;
     tileLength = 10;
     VelocityBonus = 0.5;
     WaypointBonus = 0.5;
     LookaheadFlowmapGeneration = true;
+    MergingPathSearch = true;
 
 #if WITH_EDITOR
     DrawAllBlockedCells = false;
@@ -130,7 +131,7 @@ void AFlowPathManager::updateDirtyPathData()
             }
         }
         if (isWaypointDataDirty || (data.waypoints.Num() == 0 && location.tileLocation != target.tileLocation)) {
-            auto portalSearchResult = flowPath->findPortalPath(location, target);
+            auto portalSearchResult = flowPath->findPortalPath(location, target, MergingPathSearch);
             if (!portalSearchResult.success) {
                 data.current.isPathfindingActive = false;
                 data.targetAcceleration = FVector2D::ZeroVector;

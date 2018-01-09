@@ -61,7 +61,7 @@ void FFlowPathPluginModule::StartupModule()
 
     TilePoint searchStart = { FIntPoint(1, 1), FIntPoint(1, 0) };
     TilePoint searchEnd = { FIntPoint(2, 2), FIntPoint(1, 3) };
-    PortalSearchResult portalResult = path.findPortalPath(searchStart, searchEnd);
+    PortalSearchResult portalResult = path.findPortalPath(searchStart, searchEnd, false);
     //TODO: test cache
     UE_LOG(LogExec, Warning, TEXT("Success: %d"), portalResult.success);
     UE_LOG(LogExec, Warning, TEXT("Portal search [start]"));
@@ -74,7 +74,7 @@ void FFlowPathPluginModule::StartupModule()
     UE_LOG(LogExec, Warning, TEXT("---------------------"));
     portalResult.waypoints.RemoveAt(0, 2);
     path.cachePortalPath(searchEnd, portalResult.waypoints);
-    portalResult = path.findPortalPath(searchStart, searchEnd);
+    portalResult = path.findPortalPath(searchStart, searchEnd, false);
     UE_LOG(LogExec, Warning, TEXT("Testing cached path... Success: %d"), portalResult.success);
     UE_LOG(LogExec, Warning, TEXT("Portal search [start]"));
     for (int i = 0; i < portalResult.waypoints.Num(); i++) {

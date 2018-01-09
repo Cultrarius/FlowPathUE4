@@ -109,9 +109,9 @@ FlowTile *FlowPath::getTile(FIntPoint tileCoordinates) {
     return tile == nullptr ? nullptr : tile->Get();
 }
 
-PortalSearchResult FlowPath::findPortalPath(const TileVector& vector)
+PortalSearchResult FlowPath::findPortalPath(const TileVector& vector, bool useCache)
 {
-    return findPortalPath(vector.start, vector.end);
+    return findPortalPath(vector.start, vector.end, useCache);
 }
 
 void FlowPath::cachePortalPath(const TilePoint & target, TArray<const Portal*> waypoints)
@@ -195,7 +195,7 @@ TArray<const Portal*> createWaypoints(TMap<const Portal*, PortalSearchNode>& sea
 }
 
 
-PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePoint& end)
+PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePoint& end, bool useCache)
 {
     // This method conducts a modified A* search over the tile portals to find a path to the specified goal.
     // The search can merge with previous search results, which might not always lead to the optimal route,
@@ -236,7 +236,7 @@ PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePo
     for (auto& portal : (*startTile)->getPortals()) {
         PathSearchResult searchResult = (*startTile)->findPath(startPoint, portal.center);
         if (searchResult.success) {
-            PortalSearchResult cacheResult = checkCache(&portal, absoluteEnd);
+            PortalSearchResult cacheResult = useCache ? checkCache(&portal, absoluteEnd) : PortalSearchResult();
             if (cacheResult.success) {
                 return cacheResult;
             }
@@ -265,20 +265,24 @@ PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePo
         if (frontierPortal == &endPortal) {
             result.success = true;
             result.waypoints = createWaypoints(searchedNodes, &startPortal, frontier.parentPortal);
-            cachePortalPath(end, result.waypoints);
+            if (useCache) {
+                cachePortalPath(end, result.waypoints);
+            }
             break;
         }
 
-        // check the cache to merge with previous queries
-        PortalSearchResult cacheResult = checkCache(frontierPortal, absoluteEnd);
-        if (cacheResult.success) {
-            result.waypoints = createWaypoints(searchedNodes, &startPortal, frontierPortal);
-            if (result.waypoints.Num() > 0 && result.waypoints.Last() == cacheResult.waypoints[0]) {
-                result.waypoints.Pop();
+        // Check the cache to merge with previous queries, but only if we are more than one tile away from the start.
+        // This is a simple heuristic to prevent suboptimal paths for short distances (where it is the most notable).
+        if (useCache && (frontierPortal->tileCoordinates - start.tileLocation).SizeSquared() > 2) {
+            PortalSearchResult cacheResult = useCache ? checkCache(frontierPortal, absoluteEnd) : PortalSearchResult();
+            if (cacheResult.success) {
+                result.waypoints = createWaypoints(searchedNodes, &startPortal, frontierPortal);
+                if ((result.waypoints.Num() + cacheResult.waypoints.Num()) % 2 == 0 && !result.waypoints.Contains(cacheResult.waypoints[0])) { // sanity checks
+                    result.waypoints.Append(cacheResult.waypoints);
+                    cachePortalPath(end, result.waypoints);
+                    break;
+                }
             }
-            result.waypoints.Append(cacheResult.waypoints);
-            cachePortalPath(end, result.waypoints);
-            break;
         }
 
         // if we are on the goal tile we try to reach the target point from the portal

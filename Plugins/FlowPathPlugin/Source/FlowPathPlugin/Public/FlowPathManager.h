@@ -85,6 +85,15 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     bool LookaheadFlowmapGeneration;
 
+    /**
+    * If true then agents with the same goal will reuse each others path search results, which has two benefits:
+    * 1. It is faster.
+    * 2. Units tend to group together as they try to use similar paths.
+    * The drawback is that it can lead to suboptimal paths for some units.
+    */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
+    bool MergingPathSearch;
+
     /** The better a target cell direction aligns with the current agent velocity, the more its value gets boosted by the bonus (ranges from -1 to 1). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     float VelocityBonus;
