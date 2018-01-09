@@ -146,7 +146,6 @@ PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& ke
     }
     
     if (cacheEntry->Contains(key)) {
-        result.success = true;
         auto nextPortal = (*cacheEntry)[key];
         if (nextPortal != nullptr && nextPortal->tileCoordinates == start->tileCoordinates) {
             start = nextPortal;
@@ -157,12 +156,11 @@ PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& ke
             result.waypoints.Add(start);
             start = (*cacheEntry)[key];
             if (start == nullptr) {
-                check(result.waypoints.Num() % 2 == 0);
+                result.success = result.waypoints.Num() % 2 == 0;
                 return result;
             }
             cacheEntry = waypointCache.Find(start);
         }
-        result.success = false;
         ensureMsgf(false, TEXT("Waypoint cache loop count too big; trying to reach target cell (%d, %d)"), key.X, key.Y);
     }
     return result;
