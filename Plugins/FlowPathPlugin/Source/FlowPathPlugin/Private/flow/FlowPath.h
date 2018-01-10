@@ -82,6 +82,8 @@ namespace flow {
 
         PortalSearchResult checkCache(const Portal* start, const FIntPoint& absoluteTarget) const;
 
+        std::function<void(TArray<uint8>&)> createFlowmapDataProvider(FIntPoint startTile, FIntPoint delta) const;
+
     public:
         explicit FlowPath(int32 tileLength);
 
@@ -108,5 +110,11 @@ namespace flow {
         bool getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract& result);
 
         int32 fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, const Portal* lookaheadPortal);
+
+        bool hasFlowMap(const Portal* startPortal, const Portal* targetPortal) const;
+
+        void createFlowMapSourceData(FIntPoint startTile, FIntPoint delta, TArray<uint8>& result);
+
+        void cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result);
     };
 }

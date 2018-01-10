@@ -166,6 +166,33 @@ PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& ke
     return result;
 }
 
+std::function<void(TArray<uint8>&)> flow::FlowPath::createFlowmapDataProvider(FIntPoint startTile, FIntPoint delta) const
+{
+    return [this, startTile, delta](TArray<uint8>& data) {
+        // only create the data when necessary, as the tile might have already cached the flowmap result
+        data.AddUninitialized(tileLength * tileLength * 4);
+
+        for (int32 i = 0; i < 4; i++) {
+            bool xFactor = xFactorArray[i];
+            bool yFactor = yFactorArray[i];
+            bool isRight = (delta.X == 1) == xFactor;
+            bool isDown = (delta.Y == 1) == yFactor;
+            int32 deltaX = delta.X * (xFactor ? 1 : 0);
+            int32 deltaY = delta.Y * (yFactor ? 1 : 0);
+
+            auto tile = tileMap.Find(startTile + FIntPoint(deltaX, deltaY));
+            auto& tileData = tile == nullptr ? fullTileData : (*tile)->getData();
+            for (int32 y = 0; y < tileLength; y++) {
+                for (int32 x = 0; x < tileLength; x++) {
+                    int32 sourceIndex = x + y * tileLength;
+                    int32 targetIndex = toFourTileIndex(isRight, isDown, x, y, tileLength);
+                    data[targetIndex] = tileData[sourceIndex];
+                }
+            }
+        }
+    };
+}
+
 TArray<const Portal*> createWaypoints(TMap<const Portal*, PortalSearchNode>& searchedNodes, const Portal* startPortal, const Portal* lastPortal) {
     // create waypoints from the portals jumped from start to end
     TArray<const Portal*> allWaypoints;
@@ -374,32 +401,40 @@ int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPo
             auto& tileFlowMap = (*tile)->createMapToPortal(nextPortal, connectedPortal);
             return tileFlowMap[cellIndex].directionLookupIndex;
         }
-        auto dataProvider = [this, &vector, &delta](TArray<uint8>& data) {
-            // only create the data when necessary, as the tile might have already cached the flowmap result
-            data.AddUninitialized(tileLength * tileLength * 4);
-            
-            for (int32 i = 0; i < 4; i++) {
-                bool xFactor = xFactorArray[i];
-                bool yFactor = yFactorArray[i];
-                bool isRight = (delta.X == 1) == xFactor;
-                bool isDown = (delta.Y == 1) == yFactor;
-                int32 deltaX = delta.X * (xFactor ? 1 : 0);
-                int32 deltaY = delta.Y * (yFactor ? 1 : 0);                        
-
-                auto tile = tileMap.Find(vector.start.tileLocation + FIntPoint(deltaX, deltaY));
-                auto& tileData = tile == nullptr ? fullTileData : (*tile)->getData();                
-                for (int32 y = 0; y < tileLength; y++) {
-                    for (int32 x = 0; x < tileLength; x++) {
-                        int32 sourceIndex = x + y * tileLength;                                    
-                        int32 targetIndex = toFourTileIndex(isRight, isDown, x, y, tileLength);
-                        data[targetIndex] = tileData[sourceIndex];
-                    }
-                }
-            }
-        };
+        auto dataProvider = createFlowmapDataProvider(vector.start.tileLocation, delta);
         auto& tileFlowMap = (*tile)->createLookaheadFlowmap(nextPortal, lookaheadPortal, dataProvider);
         return tileFlowMap[cellIndex].directionLookupIndex;
     }
+}
+
+bool flow::FlowPath::hasFlowMap(const Portal * startPortal, const Portal * targetPortal) const
+{
+    if (startPortal == nullptr || targetPortal == nullptr) {
+        return false;
+    }
+    auto tile = tileMap.Find(startPortal->tileCoordinates);
+    if (tile == nullptr) {
+        return false;
+    }
+    return (*tile)->hasFlowMap(startPortal, targetPortal);
+}
+
+void flow::FlowPath::createFlowMapSourceData(FIntPoint startTile, FIntPoint delta, TArray<uint8>& result)
+{
+    auto dataProvider = createFlowmapDataProvider(startTile, delta);
+    dataProvider(result);
+}
+
+void flow::FlowPath::cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result)
+{
+    if (resultStartPortal == nullptr || resultEndPortal == nullptr) {
+        return;
+    }
+    auto tile = tileMap.Find(resultStartPortal->tileCoordinates);
+    if (tile == nullptr || (*tile)->hasFlowMap(resultStartPortal, resultEndPortal)) {
+        return;
+    }
+    (*tile)->cacheFlowMap(resultStartPortal, resultEndPortal, result);
 }
 
 bool FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract & result)

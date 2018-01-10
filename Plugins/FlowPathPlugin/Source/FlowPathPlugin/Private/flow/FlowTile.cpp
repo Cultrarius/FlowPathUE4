@@ -295,7 +295,7 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
     }
 }
 
-int32 toDirectionIndex(Orientation facing) {
+int32 flow::toDirectionIndex(Orientation facing) {
     if (facing == Orientation::LEFT) {
         return 0;
     }
@@ -324,32 +324,7 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
         SCOPE_CYCLE_COUNTER(STAT_TilePortalFlowmap);
 
         TArray<FIntPoint> targets;
-
-        // only use points shared by both portals
-        int32 startX = targetPortal->start.X;
-        int32 startY = targetPortal->start.Y;
-        int32 endX = targetPortal->end.X;
-        int32 endY = targetPortal->end.Y;
-        if (targetPortal->orientation == Orientation::LEFT || targetPortal->orientation == Orientation::RIGHT) {
-            startY = max(connectedPortal->start.Y, startY);
-            endY = min(connectedPortal->end.Y, endY);
-        }
-        if (targetPortal->orientation == Orientation::TOP || targetPortal->orientation == Orientation::BOTTOM) {
-            startX = max(connectedPortal->start.X, startX);
-            endX = min(connectedPortal->end.X, endX);
-        }
-        check(startX <= endX);
-        check(startY <= endY);
-
-        FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
-        FIntPoint current(startX, startY);
-        FIntPoint end(endX, endY);
-        while (current != end) {
-            targets.Add(current);
-            current += increment;
-        }
-        targets.Add(end);
-
+        calculateFlowmapTargets(targetPortal, connectedPortal, targets);
         auto resultMap = createMapToTarget(targets);
         for (auto p : targets) {
             // For non-portal target points the direction lookups are invalid.
@@ -363,6 +338,56 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
 }
 
 
+
+void flow::FlowTile::calculateFlowmapTargets(const Portal* startPortal, const Portal* endPortal, TArray<FIntPoint> &targets)
+{
+    auto delta = endPortal->tileCoordinates - startPortal->tileCoordinates;
+    bool lookahead = delta.X != 0 && delta.Y != 0;
+
+    if (lookahead) {
+        int32 deltaX = delta.X == 1 ? tileLength : 0;
+        int32 deltaY = delta.Y == 1 ? tileLength : 0;
+        int32 startX = endPortal->start.X + deltaX;
+        int32 startY = endPortal->start.Y + deltaY;
+        int32 endX = endPortal->end.X + deltaX;
+        int32 endY = endPortal->end.Y + deltaY;
+
+        FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
+        FIntPoint current(startX, startY);
+        FIntPoint end(endX, endY);
+        while (current != end) {
+            targets.Add(current);
+            current += increment;
+        }
+        targets.Add(end);
+    }
+    else {
+        // only use points shared by both portals
+        int32 startX = startPortal->start.X;
+        int32 startY = startPortal->start.Y;
+        int32 endX = startPortal->end.X;
+        int32 endY = startPortal->end.Y;
+        if (startPortal->orientation == Orientation::LEFT || startPortal->orientation == Orientation::RIGHT) {
+            startY = max(endPortal->start.Y, startY);
+            endY = min(endPortal->end.Y, endY);
+        }
+        if (startPortal->orientation == Orientation::TOP || startPortal->orientation == Orientation::BOTTOM) {
+            startX = max(endPortal->start.X, startX);
+            endX = min(endPortal->end.X, endX);
+        }
+        check(startX <= endX);
+        check(startY <= endY);
+
+        FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
+        FIntPoint current(startX, startY);
+        FIntPoint end(endX, endY);
+        while (current != end) {
+            targets.Add(current);
+            current += increment;
+        }
+        targets.Add(end);
+    }
+}
 
 const TArray<EikonalCellValue>& flow::FlowTile::createLookaheadFlowmap(const Portal * targetPortal, const Portal * lookaheadPortal, function<void(TArray<uint8>&)> dataProvider)
 {
@@ -394,21 +419,7 @@ const TArray<EikonalCellValue>& flow::FlowTile::createLookaheadFlowmap(const Por
 
         // use all points from the lookahead portal as targets
         TArray<FIntPoint> targets;
-        int32 deltaX = delta.X == 1 ? tileLength : 0;
-        int32 deltaY = delta.Y == 1 ? tileLength : 0;
-        int32 startX = lookaheadPortal->start.X + deltaX;
-        int32 startY = lookaheadPortal->start.Y + deltaY;
-        int32 endX = lookaheadPortal->end.X + deltaX;
-        int32 endY = lookaheadPortal->end.Y + deltaY;
-
-        FIntPoint increment(startX < endX ? 1 : 0, startY < endY ? 1 : 0);
-        FIntPoint current(startX, startY);
-        FIntPoint end(endX, endY);
-        while (current != end) {
-            targets.Add(current);
-            current += increment;
-        }
-        targets.Add(end);
+        calculateFlowmapTargets(targetPortal, lookaheadPortal, targets);
 
         // create the map, then extract the original tile from it (discard the rest of the flowmap)
         auto resultMap = CreateEikonalSurface(bigTileData, targets);
@@ -436,6 +447,19 @@ TArray<TArray<EikonalCellValue>> flow::FlowTile::getAllFlowMaps() const
     TArray<TArray<EikonalCellValue>> result;
     eikonalMaps.GenerateValueArray(result);
     return result;
+}
+
+bool flow::FlowTile::hasFlowMap(const Portal * startPortal, const Portal * targetPortal) const
+{
+    return eikonalMaps.Contains({ startPortal, targetPortal });
+}
+
+void flow::FlowTile::cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result)
+{
+    if (result.Num() != tileLength * tileLength) {
+        return;
+    }
+    eikonalMaps.Add({ resultStartPortal, resultEndPortal }, result);
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const

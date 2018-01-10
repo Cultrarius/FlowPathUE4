@@ -20,6 +20,8 @@ AFlowPathManager::AFlowPathManager()
     WaypointBonus = 0.5;
     LookaheadFlowmapGeneration = true;
     MergingPathSearch = true;
+    GeneratorThreadPoolSize = 8;
+    MaxAsyncFlowMapUpdatesPerTick = 50;
 
 #if WITH_EDITOR
     DrawAllBlockedCells = false;
@@ -113,6 +115,124 @@ void AFlowPathManager::DebugDrawFlowMaps()
 
 #endif		// WITH_EDITOR
 
+void AFlowPathManager::precomputeFlowmaps(const AgentData& data)
+{
+    if (!Pool.IsValid()) {
+        return;
+    }
+
+    TilePoint target = toTilePoint(data.current.targetLocation);
+    for (int32 i = data.waypointIndex + 2; i < data.waypoints.Num(); i += 2) {
+        generatorTasks.emplace_front(target, data.waypoints, i, LookaheadFlowmapGeneration, *flowPath, tileLock);
+        Pool->AddQueuedWork(&generatorTasks.front());
+    }
+}
+
+FlowMapGenerationTask::FlowMapGenerationTask(const TilePoint & target, TArray<const Portal*> waypoints, int32 workIndex, bool lookahead, FlowPath& flowPath, FCriticalSection& tileLock)
+    : target(target), waypoints(waypoints), workIndex(workIndex), lookaheadAllowed(lookahead), flowPath(flowPath), tileLock(tileLock)
+{
+    if (workIndex + 1 >= waypoints.Num()) {
+        Abandon();
+        return;
+    }
+    workingTile = waypoints[workIndex]->tileCoordinates;
+}
+
+void FlowMapGenerationTask::Abandon()
+{
+    isAbandoned = true;
+}
+
+void FlowMapGenerationTask::DoThreadedWork()
+{
+    // copy the data while we hold the lock so we do not have to check during the calculation that any pointers or tiles are still valid
+    TArray<uint8> sourceData;
+    TArray<FIntPoint> targets;
+    bool usesLookahead = false;
+
+    {
+        //TODO this should be a read-write lock for better performance
+        FScopeLock lock(&tileLock);
+
+        if (!isAbandoned) {
+            auto nextPortal = waypoints[workIndex];
+            auto connectedPortal = waypoints[workIndex + 1];
+            auto lookaheadPortal = (lookaheadAllowed && waypoints.Num() > workIndex + 3) ? waypoints[workIndex + 3] : nullptr;
+            if (lookaheadPortal != nullptr && waypoints.Num() > workIndex + 4 && waypoints[workIndex + 4]->tileCoordinates == lookaheadPortal->tileCoordinates) {
+                lookaheadPortal = waypoints[workIndex + 4];
+            }
+            TilePoint location = { workingTile, nextPortal->center };
+            auto delta = lookaheadPortal == nullptr ? FIntPoint::ZeroValue : lookaheadPortal->tileCoordinates - workingTile;
+            usesLookahead = delta.SizeSquared() == 2;
+
+            resultStartPortal = nextPortal;
+            resultEndPortal = usesLookahead ? lookaheadPortal : connectedPortal;
+            if (flowPath.hasFlowMap(nextPortal, resultEndPortal)) {
+                Abandon();
+            }
+            else {
+                nextPortal->parentTile->calculateFlowmapTargets(nextPortal, resultEndPortal, targets);
+                if (usesLookahead) {
+                    flowPath.createFlowMapSourceData(workingTile, delta, sourceData);
+                }
+                else {
+                    sourceData = nextPortal->parentTile->getData();
+                }
+            }
+        }
+    }
+
+    if (sourceData.Num() > 0 && targets.Num() > 0) {
+        result = CreateEikonalSurface(sourceData, targets);
+
+        if (result.Num() > 0) {
+            int32 tileLength = FMath::Sqrt(result.Num()) / 2;
+            if (usesLookahead) {
+                // extract the important part from the 2x2 tile
+                auto delta = resultEndPortal->tileCoordinates - workingTile;
+                TArray<EikonalCellValue> extractedMap;
+                extractedMap.AddUninitialized(tileLength * tileLength);
+                for (int32 y = 0; y < tileLength; y++) {
+                    for (int32 x = 0; x < tileLength; x++) {
+                        int32 sourceIndex = toFourTileIndex(delta.X == -1, delta.Y == -1, x, y, tileLength);
+                        int32 targetIndex = x + y * tileLength;
+                        extractedMap[targetIndex] = result[sourceIndex];
+                    }
+                }
+                result = extractedMap;
+            }
+            else {
+                for (auto p : targets) {
+                    // Change values for the portal window, so that an agent will pass to the next tile.
+                    int32 index = p.X + p.Y * tileLength;
+                    result[index].directionLookupIndex = toDirectionIndex(resultStartPortal->orientation);
+                }
+            }
+        }
+    }
+
+    isDone = true;
+}
+
+void AFlowPathManager::processFlowMapGenerators()
+{
+    if (!Pool.IsValid()) {
+        return;
+    }
+     
+    int32 count = 0;
+    for (auto it = generatorTasks.begin(); it != generatorTasks.end() || count > MaxAsyncFlowMapUpdatesPerTick; it++) {
+        auto& task = *it;
+        if (task.isDone) {
+            if (!task.isAbandoned && task.result.Num() > 0) {
+                flowPath->cacheFlowMap(task.resultStartPortal, task.resultEndPortal, task.result);
+            }
+            it = generatorTasks.erase(it);
+        }
+        count++;
+    }
+}
+
 void AFlowPathManager::updateDirtyPathData()
 {
     SCOPE_CYCLE_COUNTER(STAT_ManagerDirtyPaths);
@@ -146,6 +266,7 @@ void AFlowPathManager::updateDirtyPathData()
             }
             data.waypoints = portalSearchResult.waypoints;
             data.waypointIndex = 0;
+            precomputeFlowmaps(data);
         }
 
         bool followingPortals = data.waypointIndex < data.waypoints.Num();
@@ -317,7 +438,8 @@ void AFlowPathManager::Tick(float DeltaTime)
     SCOPE_CYCLE_COUNTER(STAT_ManagerTick);
 
     Super::Tick(DeltaTime);
-    TArray<UObject*> agentsToRemove;
+
+    processFlowMapGenerators();
 
 #if WITH_EDITOR
     if (DrawAllBlockedCells) {
@@ -331,6 +453,7 @@ void AFlowPathManager::Tick(float DeltaTime)
     }
 #endif		// WITH_EDITOR
 
+    TArray<UObject*> agentsToRemove;
     for (auto& agentPair : agents) {
         UObject* agent = agentPair.Key;
         AgentData& data = agentPair.Value;
@@ -398,6 +521,17 @@ void AFlowPathManager::Tick(float DeltaTime)
 
 void AFlowPathManager::InitializeTiles()
 {
+    if (GeneratorThreadPoolSize > 0) {
+        Pool.Reset(FQueuedThreadPool::Allocate());
+        if (!Pool->Create(GeneratorThreadPoolSize, 32 * 1024, TPri_BelowNormal)) {
+            Pool.Reset(nullptr);
+        }
+    }
+    else {
+        Pool.Reset(nullptr);
+    }
+    generatorTasks.clear();
+
     FMatrix2x2 scaleMatrix(WorldToTileScale.X, 0, 0, WorldToTileScale.Y);
     WorldToTileTransform = FTransform2D(scaleMatrix, WorldToTileTranslation);
     flowPath = MakeUnique<FlowPath>(tileLength);
@@ -493,3 +627,4 @@ void AFlowPathManager::RemoveAgent(UObject * agent)
     check(agent);
     agents.Remove(agent);
 }
+

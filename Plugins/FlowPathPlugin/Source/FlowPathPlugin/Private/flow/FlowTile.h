@@ -46,6 +46,8 @@ namespace flow {
 
     int32 toFourTileIndex(bool isRight, bool isDown, int32 x, int32 y, int32 tileLength);
 
+    int32 toDirectionIndex(Orientation facing);
+
     struct EikonalCellValue {
         int8 directionLookupIndex;
         float cellValue;
@@ -98,10 +100,16 @@ namespace flow {
 
         const TArray<EikonalCellValue>& createMapToPortal(const Portal* targetPortal, const Portal* connectedPortal);
 
+        void calculateFlowmapTargets(const Portal* startPortal, const Portal* endPortal, TArray<FIntPoint> &targets);
+
         const TArray<EikonalCellValue>& createLookaheadFlowmap(const Portal* targetPortal, const Portal* lookaheadPortal, std::function<void(TArray<uint8>&)> dataProvider);
 
         TArray<EikonalCellValue> createMapToTarget(const TArray<FIntPoint>& targets);
 
         TArray<TArray<EikonalCellValue>> getAllFlowMaps() const;
+
+        bool hasFlowMap(const Portal* startPortal, const Portal* targetPortal) const;
+
+        void cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result);
     };
 }

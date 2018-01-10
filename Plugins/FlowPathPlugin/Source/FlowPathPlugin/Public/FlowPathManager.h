@@ -7,7 +7,12 @@
 #include "flow/FlowPath.h"
 #include "NavAgent.h"
 #include "TransformCalculus2D.h"
+#include "QueuedThreadPool.h"
+#include "IQueuedWork.h"
+#include <list>
+#include "ThreadSafeBool.h"
 #include "FlowPathManager.generated.h"
+
 
 struct AgentData {
     UObject* agent;
@@ -25,18 +30,58 @@ struct AgentData {
     int32 waypointIndex;
 };
 
+class FlowMapGenerationTask : public IQueuedWork
+{
+private:
+    flow::TilePoint target;
+    TArray<const flow::Portal*> waypoints;
+    int32 workIndex;
+    bool lookaheadAllowed;
+    flow::FlowPath& flowPath;
+    FCriticalSection& tileLock;
+
+public:
+    FIntPoint workingTile;
+    FThreadSafeBool isDone;
+    FThreadSafeBool isAbandoned;
+    TArray<flow::EikonalCellValue> result;
+    const flow::Portal * resultStartPortal;
+    const flow::Portal * resultEndPortal;
+
+    FlowMapGenerationTask(const flow::TilePoint& target, TArray<const flow::Portal*> waypoints, int32 workIndex, bool lookahead, flow::FlowPath& flowPath, FCriticalSection& tileLock);
+    
+    /**
+    * Tells the queued work that it is being abandoned so that it can do
+    * per object clean up as needed. This will only be called if it is being
+    * abandoned before completion. NOTE: This requires the object to delete
+    * itself using whatever heap it was allocated in.
+    */
+    void Abandon() override;
+
+    /**
+    * This method is also used to tell the object to cleanup but not before
+    * the object has finished it's work.
+    */
+    void DoThreadedWork() override;
+};
+
+
 UCLASS(meta = (BlueprintSpawnableComponent), BlueprintType)
 class FLOWPATHPLUGIN_API AFlowPathManager : public AActor
 {
     GENERATED_BODY()
 private:
     TUniquePtr<flow::FlowPath> flowPath;
-
     TMap<UObject*, AgentData> agents;
-
     FTransform2D WorldToTileTransform;
 
+    TUniquePtr<FQueuedThreadPool> Pool;
+    std::list<FlowMapGenerationTask> generatorTasks;
+    FCriticalSection tileLock;
+    
     void updateDirtyPathData();
+
+    void processFlowMapGenerators();
 
     float calcVelocityBonus(const FVector2D& velocityDirection, int32 i) const;
 
@@ -53,6 +98,8 @@ protected:
     flow::TilePoint absoluteTilePosToTilePoint(FVector2D tilePosition) const;
 
     bool findClosestWaypoint(const AgentData& data, const flow::TilePoint& agentLocation, flow::TilePoint& result) const;
+
+    void precomputeFlowmaps(const AgentData& data);
 
 public:	
 
@@ -101,6 +148,21 @@ public:
     /** The better a cell aligns with the next waypoint, the more its value gets boosted by the bonus (ranges from -1 to 1). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     float WaypointBonus;
+
+    /**
+    * If true then agents with the same goal will reuse each others path search results, which has two benefits:
+    * 1. It is faster.
+    * 2. Units tend to group together as they try to use similar paths.
+    * The drawback is that it can lead to suboptimal paths for some units.
+    */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = FlowPath)
+    int32 GeneratorThreadPoolSize;
+
+    /** 
+    * The max number of precomputed flowmaps that are written per tick. This is mainly used to smooth the updates over a few tick to prevent lag spikes.
+    */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = FlowPath)
+    int32 MaxAsyncFlowMapUpdatesPerTick;
 
     AFlowPathManager();
 
