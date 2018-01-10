@@ -25,7 +25,7 @@ bool FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tile
     }
     bool isEmpty = true;
     bool isBlocked = true;
-    for (int32 i = 0; i < tileLength * tileLength; i++) {
+    for (int32 i = 0; i < tileData.Num(); i++) {
         if (tileData[i] == 0) {
             return false;
         }
@@ -50,12 +50,56 @@ bool FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tile
     }
     auto existingTile = tileMap.Find(coord);
     if (existingTile != nullptr) {
+        clearTileFromWaypointCache(**existingTile);
         (*existingTile)->removeConnectedPortals();
+        // TODO invalidate lookahead flowmaps
         tileMap.Remove(coord);
     }
     tileMap.Add(coord, TUniquePtr<FlowTile>(tile));
     updatePortals(coord);
     return true;
+}
+
+void flow::FlowPath::clearTileFromWaypointCache(const FlowTile & tile)
+{
+    // see which portals we have to remove from the cache
+    TSet<const Portal*> portalsToRemove;
+    for (auto& portal : tile.getPortals()) {
+        portalsToRemove.Add(&portal);
+        for (auto& connected : portal.connected) {
+            portalsToRemove.Add(connected.Key);
+        }
+    }
+
+    //remove the portal entries from the cache
+    for (auto& portal : portalsToRemove) {
+        auto cacheEntry = waypointCache.Find(portal);
+        if (cacheEntry == nullptr) {
+            continue;
+        }
+
+        for (auto& goal : *cacheEntry) {
+            auto targetToRemove = goal.Key;
+
+            // remove portals up the chain
+            auto parent = goal.Value.fromPortal;
+            while (parent != nullptr) {
+                auto nextParent = waypointCache[parent][targetToRemove];
+                waypointCache[parent].Remove(targetToRemove);
+                parent = nextParent.fromPortal;
+            }
+
+            // remove portals down the chain
+            auto child = goal.Value.toPortal;
+            while (child != nullptr) {
+                auto nextChild = waypointCache[child][targetToRemove];
+                waypointCache[child].Remove(targetToRemove);
+                child = nextChild.toPortal;
+            }
+        }
+
+        waypointCache.Remove(portal);
+    }
 }
 
 uint8 FlowPath::getDataFor(const TilePoint & p) const
@@ -121,9 +165,10 @@ void FlowPath::cachePortalPath(const TilePoint & target, TArray<const Portal*> w
     int32 absoluteX = target.pointInTile.X + target.tileLocation.X * tileLength;
     int32 absoluteY = target.pointInTile.Y + target.tileLocation.Y * tileLength;
     for (int i = 0; i < waypoints.Num(); i++) {
+        auto prevPortal = i == 0 ? nullptr : waypoints[i - 1];
         auto portal = waypoints[i];
         auto nextPortal = (i == waypoints.Num() - 1) ? nullptr : waypoints[i + 1];
-        waypointCache.FindOrAdd(portal).Add({ absoluteX , absoluteY }, nextPortal);
+        waypointCache.FindOrAdd(portal).Add({ absoluteX , absoluteY }, { prevPortal, nextPortal });
     }
 }
 
@@ -146,7 +191,7 @@ PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& ke
     }
     
     if (cacheEntry->Contains(key)) {
-        auto nextPortal = (*cacheEntry)[key];
+        auto nextPortal = (*cacheEntry)[key].toPortal;
         if (nextPortal != nullptr && nextPortal->tileCoordinates == start->tileCoordinates) {
             start = nextPortal;
             cacheEntry = waypointCache.Find(start);
@@ -154,7 +199,7 @@ PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& ke
         
         for (int i = 0; i < 100000; i++) { // just a guard against faulty data
             result.waypoints.Add(start);
-            start = (*cacheEntry)[key];
+            start = (*cacheEntry)[key].toPortal;
             if (start == nullptr) {
                 result.success = result.waypoints.Num() % 2 == 0;
                 return result;
@@ -169,7 +214,6 @@ PortalSearchResult FlowPath::checkCache(const Portal* start, const FIntPoint& ke
 std::function<void(TArray<uint8>&)> flow::FlowPath::createFlowmapDataProvider(FIntPoint startTile, FIntPoint delta) const
 {
     return [this, startTile, delta](TArray<uint8>& data) {
-        // only create the data when necessary, as the tile might have already cached the flowmap result
         data.AddUninitialized(tileLength * tileLength * 4);
 
         for (int32 i = 0; i < 4; i++) {
@@ -351,6 +395,20 @@ TArray<const Portal*> FlowPath::getAllPortals() const
 
     for (auto& tilePair : tileMap) {
         for (auto& portal : tilePair.Value->getPortals()) {
+            result.Add(&portal);
+        }
+    }
+
+    return result;
+}
+
+TArray<const Portal*> flow::FlowPath::getAllTilePortals(FIntPoint tileCoordinates) const
+{
+    TArray<const Portal*> result;
+
+    auto tile = tileMap.Find(tileCoordinates);
+    if (tile != nullptr) {
+        for (auto& portal : (*tile)->getPortals()) {
             result.Add(&portal);
         }
     }

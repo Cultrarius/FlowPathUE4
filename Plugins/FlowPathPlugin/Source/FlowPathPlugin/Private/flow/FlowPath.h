@@ -58,13 +58,20 @@ namespace flow {
         float neighborCells[8];
     };
 
-    typedef TMap<FIntPoint, const Portal*> CacheEntry;
+    struct PortalLink {
+        const Portal* fromPortal;
+        const Portal* toPortal;
+    };
+
+    typedef TMap<FIntPoint, PortalLink> CacheEntry;
     typedef TMap<const Portal*, CacheEntry> WaypointCache;
 
     class FlowPath {
     private:
         TArray<uint8> emptyTileData;
         TArray<uint8> fullTileData;
+
+        // TODO: add precomputed flowfield for empty tiles
 
         int32 tileLength;
         TileMap tileMap;
@@ -83,6 +90,8 @@ namespace flow {
         PortalSearchResult checkCache(const Portal* start, const FIntPoint& absoluteTarget) const;
 
         std::function<void(TArray<uint8>&)> createFlowmapDataProvider(FIntPoint startTile, FIntPoint delta) const;
+
+        void clearTileFromWaypointCache(const FlowTile& tile);
 
     public:
         explicit FlowPath(int32 tileLength);
@@ -104,6 +113,8 @@ namespace flow {
         TArray<FIntPoint> getAllValidTileCoordinates() const;
 
         TArray<const Portal*> getAllPortals() const;
+
+        TArray<const Portal*> getAllTilePortals(FIntPoint tileCoordinates) const;
 
         TMap<FIntPoint, TArray<TArray<EikonalCellValue>>> getAllFlowMaps() const;
 

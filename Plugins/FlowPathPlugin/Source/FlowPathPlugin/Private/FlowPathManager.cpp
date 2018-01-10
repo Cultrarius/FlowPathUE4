@@ -545,7 +545,35 @@ bool AFlowPathManager::UpdateMapTileWorld(FVector2D worldPosition, const TArray<
 
 bool AFlowPathManager::UpdateMapTileLocal(int32 tileX, int32 tileY, const TArray<uint8>& tileData)
 {
-    return flowPath && flowPath->updateMapTile(tileX, tileY, tileData);
+    FScopeLock lock(&tileLock);
+
+    FIntPoint tileCoord(tileX, tileY);
+    auto originalTilePortals = flowPath->getAllTilePortals(tileCoord);
+    bool success = flowPath->updateMapTile(tileX, tileY, tileData);
+
+    if (success) {
+        // remove invalidated waypoint data
+        for (auto& data : agents) {
+            TSet<const flow::Portal*> waypointPortals;
+            waypointPortals.Append(data.Value.waypoints);
+            for (auto& oldPortal : originalTilePortals) {
+                if (waypointPortals.Contains(oldPortal)) {
+                    data.Value.waypoints.Empty();
+                    break;
+                }
+            }
+        }
+
+        if (Pool.IsValid()) {
+            // stop async flowmap tasks working on that tile
+            for (auto& task : generatorTasks) {
+                if (task.workingTile == tileCoord) {
+                    task.Abandon();
+                }
+            }
+        }
+    }
+    return success;
 }
 
 bool AFlowPathManager::UpdateMapTilesFromTexture(int32 tileXUpperLeft, int32 tileYUpperLeft, UTexture2D* texture)

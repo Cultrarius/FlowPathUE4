@@ -40,7 +40,6 @@ TArray<EikonalCellValue> flow::CreateEikonalSurface(const TArray<uint8>& sourceD
     int32 length = FMath::Sqrt(tileSize);
     check(length);
 
-    
     // Data definitions
     TArray<bool> initializedNodes;
     initializedNodes.AddZeroed(tileSize);

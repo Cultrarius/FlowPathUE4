@@ -403,7 +403,7 @@ const TArray<EikonalCellValue>& flow::FlowTile::createLookaheadFlowmap(const Por
         auto delta = lookaheadPortal->tileCoordinates - targetPortal->tileCoordinates;
         bool lookahead = delta.X != 0 && delta.Y != 0;
 
-        // gather the data
+        // only create the data when necessary, as the tile might have already cached the flowmap result
         TArray<uint8> bigTileData;
         dataProvider(bigTileData);
         check(bigTileData.Num() == tileLength * tileLength * 4);
