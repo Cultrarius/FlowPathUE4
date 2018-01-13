@@ -46,6 +46,9 @@ namespace flow {
     struct TilePoint {
         FIntPoint tileLocation;
         FIntPoint pointInTile;
+
+        bool operator==(const TilePoint& other) const;
+        bool operator!=(const TilePoint& other) const;
     };
 
     struct TileVector {

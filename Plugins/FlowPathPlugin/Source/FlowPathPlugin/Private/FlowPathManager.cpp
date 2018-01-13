@@ -221,15 +221,18 @@ void AFlowPathManager::processFlowMapGenerators()
     }
      
     int32 count = 0;
-    for (auto it = generatorTasks.begin(); it != generatorTasks.end() || count > MaxAsyncFlowMapUpdatesPerTick; it++) {
-        auto& task = *it;
+    for (auto it = generatorTasks.begin(); it != generatorTasks.end() && count < MaxAsyncFlowMapUpdatesPerTick;) {
+        const auto& task = *it;
         if (task.isDone) {
             if (!task.isAbandoned && task.result.Num() > 0) {
                 flowPath->cacheFlowMap(task.resultStartPortal, task.resultEndPortal, task.result);
+                count++;
             }
             it = generatorTasks.erase(it);
         }
-        count++;
+        else {
+            it++;
+        }
     }
 }
 
@@ -243,14 +246,13 @@ void AFlowPathManager::updateDirtyPathData()
         if (!data.current.isPathfindingActive || !data.isPathDataDirty) {
             continue;
         }
-        TilePoint location = toTilePoint(data.current.agentLocation);
-        TilePoint target = toTilePoint(data.current.targetLocation);
+        auto& location = data.currentLocation;
+        auto& target = data.currentTarget;
 
         // check and update the portal waypoint data
-        bool isWaypointDataDirty = false;
-        if (data.waypoints.Num() > 0 && data.waypoints.Num() > data.waypointIndex) {
+        bool isWaypointDataDirty = target != data.lastTarget;
+        if (!isWaypointDataDirty && data.waypoints.Num() > 0 && data.waypoints.Num() > data.waypointIndex) {
             if (data.waypoints[data.waypointIndex + 1]->tileCoordinates == location.tileLocation) {
-                isWaypointDataDirty = false;
                 data.waypointIndex += 2;
             } else if (data.waypoints[data.waypointIndex]->tileCoordinates != location.tileLocation) {
                 isWaypointDataDirty = true;
@@ -487,7 +489,12 @@ void AFlowPathManager::Tick(float DeltaTime)
 #endif		// WITH_EDITOR
 
         data.lastTick = data.current;
+        data.lastLocation = data.currentLocation;
+        data.lastTarget = data.currentTarget;
         data.current = INavAgent::Execute_GetAgentInfo(agent);
+        data.currentLocation = toTilePoint(data.current.agentLocation);
+        data.currentTarget = toTilePoint(data.current.targetLocation);
+
         bool isActive = data.current.isPathfindingActive;
         if (isActive) {
             if ((data.current.targetLocation - data.current.agentLocation).SizeSquared() <= (AcceptanceRadius * AcceptanceRadius)) {
@@ -503,11 +510,9 @@ void AFlowPathManager::Tick(float DeltaTime)
                 data.targetAcceleration = FVector2D::ZeroVector;
                 data.waypoints.Empty();
             }
-            else {
-                if (!data.isPathDataDirty) {
-                    INavAgent::Execute_UpdateAcceleration(agent, data.targetAcceleration);
-                }
-                data.isPathDataDirty = data.current.agentLocation != data.lastTick.agentLocation || data.current.targetLocation != data.lastTick.targetLocation;
+            else if (!data.isPathDataDirty) {
+                INavAgent::Execute_UpdateAcceleration(agent, data.targetAcceleration);
+                 data.isPathDataDirty = data.currentLocation != data.lastLocation || data.currentTarget != data.lastTarget;
             }
         }
     }
@@ -559,6 +564,7 @@ bool AFlowPathManager::UpdateMapTileLocal(int32 tileX, int32 tileY, const TArray
             for (auto& oldPortal : originalTilePortals) {
                 if (waypointPortals.Contains(oldPortal)) {
                     data.Value.waypoints.Empty();
+                    data.Value.isPathDataDirty = true;
                     break;
                 }
             }
@@ -634,7 +640,7 @@ uint8 AFlowPathManager::GetTileDataForWorldPosition(FVector2D worldPosition)
     int32 y = FMath::Abs(tilePos.Y - tileY) * tileLength;
     TilePoint p = { FIntPoint(tileX, tileY), FIntPoint(x, y) };
 
-    UE_LOG(LogExec, Warning, TEXT("Tile %d, %d: Pos %d, %d"), tileX, tileY, x, y);
+    //UE_LOG(LogExec, Warning, TEXT("Tile %d, %d: Pos %d, %d"), tileX, tileY, x, y);
 
     return flowPath->getDataFor(p);
 }

@@ -19,9 +19,13 @@ struct AgentData {
 
     // data from the current tick
     FAgentInfo current;
-
+    flow::TilePoint currentLocation;
+    flow::TilePoint currentTarget;
+        
     // data from the last tick
     FAgentInfo lastTick;
+    flow::TilePoint lastLocation;
+    flow::TilePoint lastTarget;
 
     // pathfinding data
     bool isPathDataDirty = false;

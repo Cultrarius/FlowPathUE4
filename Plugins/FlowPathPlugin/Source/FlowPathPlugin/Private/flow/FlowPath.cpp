@@ -19,6 +19,16 @@ FlowPath::FlowPath(int32 tileLength) : tileLength(tileLength) {
     }
 }
 
+bool flow::TilePoint::operator==(const TilePoint & other) const
+{
+    return tileLocation == other.tileLocation && pointInTile == other.pointInTile;
+}
+
+bool flow::TilePoint::operator!=(const TilePoint & other) const
+{
+    return tileLocation != other.tileLocation || pointInTile != other.pointInTile;
+}
+
 bool FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tileData) {
     if (tileData.Num() != tileLength * tileLength) {
         return false;
