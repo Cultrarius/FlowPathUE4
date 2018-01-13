@@ -359,6 +359,7 @@ PortalSearchResult FlowPath::findPortalPath(const TilePoint& start, const TilePo
                 if ((result.waypoints.Num() + cacheResult.waypoints.Num()) % 2 == 0 && !result.waypoints.Contains(cacheResult.waypoints[0])) { // sanity checks
                     result.waypoints.Append(cacheResult.waypoints);
                     cachePortalPath(end, result.waypoints);
+                    result.success = true;
                     break;
                 }
             }
@@ -503,6 +504,15 @@ void flow::FlowPath::cacheFlowMap(const Portal * resultStartPortal, const Portal
         return;
     }
     (*tile)->cacheFlowMap(resultStartPortal, resultEndPortal, result);
+}
+
+void flow::FlowPath::deleteFlowMapsFromTile(const FIntPoint & tileCoordinates)
+{
+    auto tile = tileMap.Find(tileCoordinates);
+    if (tile == nullptr) {
+        return;
+    }
+    return (*tile)->deleteAllFlowMaps();
 }
 
 bool FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract & result)
