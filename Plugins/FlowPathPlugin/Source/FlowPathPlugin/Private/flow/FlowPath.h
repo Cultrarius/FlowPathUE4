@@ -130,5 +130,7 @@ namespace flow {
         void createFlowMapSourceData(FIntPoint startTile, FIntPoint delta, TArray<uint8>& result);
 
         void cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result);
+
+        void deleteFlowMapsFromTile(const FIntPoint& tileCoordinates);
     };
 }

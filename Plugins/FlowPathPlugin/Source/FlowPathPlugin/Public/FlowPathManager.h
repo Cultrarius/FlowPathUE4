@@ -78,6 +78,7 @@ private:
     TUniquePtr<flow::FlowPath> flowPath;
     TMap<UObject*, AgentData> agents;
     FTransform2D WorldToTileTransform;
+    int32 ticksSinceLastCleanup;
 
     TUniquePtr<FQueuedThreadPool> Pool;
     std::list<FlowMapGenerationTask> generatorTasks;
@@ -104,6 +105,8 @@ protected:
     bool findClosestWaypoint(const AgentData& data, const flow::TilePoint& agentLocation, flow::TilePoint& result) const;
 
     void precomputeFlowmaps(const AgentData& data);
+
+    void cleanupOldFlowmaps();
 
 public:	
 
@@ -168,6 +171,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = FlowPath)
     int32 MaxAsyncFlowMapUpdatesPerTick;
 
+    /**
+    * The number of ticks that need to pass before all cached and unused flowmaps are deleted to reclaim memory.
+    * A negative value means flowmaps will never be deleted once created (as long as the source data is not changed).
+    */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = FlowPath)
+    int32 CleanupFlowmapsAfterTicks;
+
     AFlowPathManager();
 
 	virtual void Tick(float DeltaTime) override;
@@ -198,6 +208,10 @@ public:
     /** Removes a previously registered agent from the path manager. */
     UFUNCTION(BlueprintCallable, Category = "FlowPath")
     void RemoveAgent(UObject* agent);
+
+    /** Checks if an agent can travel from the given start to the given end. */
+    UFUNCTION(BlueprintCallable, Category = "FlowPath")
+    bool IsPathPossible(FVector2D worldPositionStart, FVector2D worldPositionEnd) const;
 
 #if WITH_EDITOR
 

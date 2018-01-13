@@ -50,4 +50,8 @@ public:
     /** This method is called if the agent has reached the target location. */
     UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
         void TargetReached();
+
+    /** This method is called if the agent has a target location that cannot be reached. */
+    UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
+        void TargetUnreachable();
 };

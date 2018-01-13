@@ -22,6 +22,7 @@ AFlowPathManager::AFlowPathManager()
     MergingPathSearch = true;
     GeneratorThreadPoolSize = 8;
     MaxAsyncFlowMapUpdatesPerTick = 50;
+    CleanupFlowmapsAfterTicks = 1000;
 
 #if WITH_EDITOR
     DrawAllBlockedCells = false;
@@ -264,6 +265,8 @@ void AFlowPathManager::updateDirtyPathData()
                 data.current.isPathfindingActive = false;
                 data.targetAcceleration = FVector2D::ZeroVector;
                 data.isPathDataDirty = false;
+                data.waypoints.Empty();
+                INavAgent::Execute_TargetUnreachable(agentPair.Key);
                 continue;
             }
             data.waypoints = portalSearchResult.waypoints;
@@ -502,6 +505,7 @@ void AFlowPathManager::Tick(float DeltaTime)
                 data.current.isPathfindingActive = false;
                 data.isPathDataDirty = false;
                 data.targetAcceleration = FVector2D::ZeroVector;
+                data.waypoints.Empty();
                 INavAgent::Execute_TargetReached(agent);
             }
             else if (!data.lastTick.isPathfindingActive) {
@@ -512,7 +516,7 @@ void AFlowPathManager::Tick(float DeltaTime)
             }
             else if (!data.isPathDataDirty) {
                 INavAgent::Execute_UpdateAcceleration(agent, data.targetAcceleration);
-                 data.isPathDataDirty = data.currentLocation != data.lastLocation || data.currentTarget != data.lastTarget;
+                data.isPathDataDirty = data.currentLocation != data.lastLocation || data.currentTarget != data.lastTarget;
             }
         }
     }
@@ -522,6 +526,39 @@ void AFlowPathManager::Tick(float DeltaTime)
     }
 
     updateDirtyPathData();
+    cleanupOldFlowmaps();
+    
+}
+
+void AFlowPathManager::cleanupOldFlowmaps()
+{
+    if (CleanupFlowmapsAfterTicks < 0) {
+        return;
+    }
+    ticksSinceLastCleanup++;
+    if (ticksSinceLastCleanup < CleanupFlowmapsAfterTicks) {
+        return;
+    }
+    //gather currently used tiles from the agent data
+    TSet<FIntPoint> usedTiles;
+    for (auto& agentPair : agents) {
+        AgentData& data = agentPair.Value;
+        usedTiles.Add(data.currentLocation.tileLocation);
+        usedTiles.Add(data.currentTarget.tileLocation);
+        for (auto& waypoint : data.waypoints) {
+            usedTiles.Add(waypoint->tileCoordinates);
+        }
+    }
+
+    // clear flowmap caches from unused tiles
+    TArray<FIntPoint> flowMapTiles;
+    flowPath->getAllFlowMaps().GetKeys(flowMapTiles);
+    for (auto& tile : flowMapTiles) {
+        if (!usedTiles.Contains(tile)) {
+            flowPath->deleteFlowMapsFromTile(tile);
+        }
+    }
+    ticksSinceLastCleanup = 0;
 }
 
 void AFlowPathManager::InitializeTiles()
@@ -660,5 +697,12 @@ void AFlowPathManager::RemoveAgent(UObject * agent)
 {
     check(agent);
     agents.Remove(agent);
+}
+
+bool AFlowPathManager::IsPathPossible(FVector2D worldPositionStart, FVector2D worldPositionEnd) const
+{
+    TilePoint start = toTilePoint(worldPositionStart);
+    TilePoint end = toTilePoint(worldPositionEnd);
+    return flowPath->findPortalPath({ start, end }, true).success;
 }
 

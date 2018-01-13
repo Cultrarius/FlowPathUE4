@@ -462,6 +462,11 @@ void flow::FlowTile::cacheFlowMap(const Portal * resultStartPortal, const Portal
     eikonalMaps.Add({ resultStartPortal, resultEndPortal }, result);
 }
 
+void flow::FlowTile::deleteAllFlowMaps()
+{
+    eikonalMaps.Empty();
+}
+
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const
 {
     // we do not want to allow cross movements where two obstacles meet, because most likely a unit cannot move there.

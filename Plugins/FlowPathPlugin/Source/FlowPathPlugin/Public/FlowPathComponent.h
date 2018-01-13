@@ -62,6 +62,10 @@ public:
         void TargetReached();
         virtual void TargetReached_Implementation();
 
+    UFUNCTION(BlueprintNativeEvent, Category = "FlowPath")
+        void TargetUnreachable();
+        virtual void TargetUnreachable_Implementation();
+
     //~ End NavAgent Interface
 
     //~ Begin ActorComponent Interface 

@@ -111,5 +111,7 @@ namespace flow {
         bool hasFlowMap(const Portal* startPortal, const Portal* targetPortal) const;
 
         void cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result);
+
+        void deleteAllFlowMaps();
     };
 }

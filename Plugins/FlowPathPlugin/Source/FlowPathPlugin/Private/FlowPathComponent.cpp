@@ -31,6 +31,12 @@ void UFlowPathComponent::TargetReached_Implementation()
     acceleration = FVector2D::ZeroVector;
 }
 
+void UFlowPathComponent::TargetUnreachable_Implementation()
+{
+    agentInfo.isPathfindingActive = false;
+    acceleration = FVector2D::ZeroVector;
+}
+
 void UFlowPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction * ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
