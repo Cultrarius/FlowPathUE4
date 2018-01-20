@@ -160,16 +160,13 @@ public:
     bool CollisionChecking;
 
     /**
-    * If true then agents with the same goal will reuse each others path search results, which has two benefits:
-    * 1. It is faster.
-    * 2. Units tend to group together as they try to use similar paths.
-    * The drawback is that it can lead to suboptimal paths for some units.
+    * The number of thread that should be used to generate flowmaps. A number <= 0 disables threaded flowmap generation.
     */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = FlowPath)
     int32 GeneratorThreadPoolSize;
 
     /** 
-    * The max number of precomputed flowmaps that are written per tick. This is mainly used to smooth the updates over a few tick to prevent lag spikes.
+    * The max number of precomputed flowmaps that are written per tick. This is mainly used to smooth the updates over a few ticks to prevent lag spikes.
     */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = FlowPath)
     int32 MaxAsyncFlowMapUpdatesPerTick;
