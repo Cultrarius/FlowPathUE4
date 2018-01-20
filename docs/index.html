@@ -67,7 +67,7 @@
         <ol>
           <li><a href="#intro">How does it work</a></li>
           <li><a href="#setup">Setup (+requirements)</a></li>
-          <li><a href="#config">Configuration options</a></li>
+          <li><a href="#manager-config">FlowPathManager configuration</a></li>
           <li><a href="#sources">Sources</a></li>
         </ol>
         <hr>
@@ -105,24 +105,86 @@
         <hr>
 
         <h3>
-          <a id="config" class="anchor" href="#config" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
-          Configuration options</h3>
+          <a id="manager-config" class="anchor" href="#manager-config" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          FlowPathManager configuration</h3>
         <p>
-          The following gives an overview of the various configuration options.
-        </p>
-        <p>
-          <h4>FlowPathManager</h4>
-          The <span class="code">FlowPathManager</span> is the main interface to the plugin's functions.
-          It handles the surface data, path generation and updates the registered agents each tick with new movement input.
+          <p>
+            The <span class="code">FlowPathManager</span> is the main interface to control the plugin's functions.
+            It handles the surface data, path generation and updates the registered agents each tick with new movement input.
+          </p>
+          <p>
+            The following gives a detailed view of the options and methods for FlowPathManager:
+          </p>
           <dl>
-            <dt><div class="parameter">DataProviderParameterName</div></dt>
-            <dd>The module will search for a parameter with the given name on the particle component.
-              The parameter must be of type actor and provide an instance of the <span class="code">AParticleDataProvider</span> class.
-              This can be used to provide a custom location, velocity, size, rotation, roation rate or color for
-              spawned and updated particles.</dd>
+            <dt><div class="parameter">tileLength</div></dt>
+            <dd>The size of a tile. Each tile consists of individual cells, which have a movement cost attached.
+              Bigger tiles increase performance and memory needs, but lead to smoother pathfinding and less "jumps" between tiles.
+            </dd>
 
-            <dt><div class="parameter">UpdatedSpawnedParticles</div></dt>
-            <dd>If true, this module is used to update newly spawned particles.</dd>
+            <dt><div class="parameter">WorldToTileTranslation</div></dt>
+            <dd>The translation to convert a world position into a tile position (e.g. <span class="code">(100, 250) -> (105, 255)</span>).
+              This is used to align the plugin's internal tile coordinates and data representation with the game world.<br>
+              Tip: to check that the internal representation fits the world geometry, enable the debug drawing options.
+            </dd>
+
+            <dt><div class="parameter">WorldToTileScale</div></dt>
+            <dd>The scale to convert a world position into a tile position (e.g. <span class="code">(100, 250) -> (1, 2.5)</span>).
+              This is used to align the plugin's internal tile coordinates and data representation with the game world.
+              A small scale means that the same patch of a world should be represented with more tiles, which allows for more granular pathfinding, but also
+              requires a lot more memory and processing resources.<br>
+              A good measure for the scale is that each resulting cell coordinate fits one agent.<br>
+              Tip: to check that the internal representation fits the world geometry, enable the debug drawing options.
+            </dd>
+
+            <dt><div class="parameter">AcceptanceRadius</div></dt>
+            <dd>The world-distance to the target at which the pathfinder marks a query as finished.</dd>
+
+            <dt><div class="parameter">LookaheadFlowmapGeneration</div></dt>
+            <dd>If true then flowmaps can be generated with data from the tiles around them by 'looking ahead' in a 2x2 tile grid.
+               This leads to higher quality flowmaps, but it also increases the calculation times and a flowmap also becomes invalid if a neighbor tile is changed.
+               <p>
+               See the following example, where each letter is a different tile:
+<pre>
+|A|B|C|   Agent wants to go from tile A to tile I.
++-+-+-+   Calculated tile path: A -> B -> E -> F -> I
+|D|E|F|
++-+-+-+
+|G|H|I|
+</pre>
+              Without the lookahead flowmap generation, an agent standing on tile A will always go just right, because the next tile on its path is tile B to the right.
+              With the lookahead flowmap, the agent will try to go directly to tile E (which comes after B as a waypoint) and so goes down and to the right.
+              To generate this lookahead flowmap, date from tiles A, B, D and E is necessary (instead of just A).
+              </p>
+            </dd>
+
+            <dt><div class="parameter">MergingPathSearch</div></dt>
+            <dd>If true then agents with the same goal will reuse each others path search results, which has two benefits:<br>
+              1. It is faster.<br>
+              2. Units tend to group together as they try to use similar paths.<br>
+              The drawback is that it can lead to suboptimal paths for some units.
+            </dd>
+
+            <dt><div class="parameter">CollisionChecking</div></dt>
+            <dd>If true then agents will try to avoid collisions by steering to nearby free cells and reducing velocity.
+              Enabling this option has a negative performance impact.
+            </dd>
+
+            <dt><div class="parameter">GeneratorThreadPoolSize</div></dt>
+            <dd>The number of thread that should be used to generate flowmaps.
+              A number <= 0 disables threaded flowmap generation.<br>
+              If a flowmap for a tile was not generated (e.g. because threaded generation is disabled) before it is requested, the generation is done on the tick thread.
+              Too many flowmap generations per tick can lead to performance problems.
+            </dd>
+
+            <dt><div class="parameter">MaxAsyncFlowMapUpdatesPerTick</div></dt>
+            <dd>The max number of precomputed flowmaps that are written per tick. This is mainly used to smooth the updates over a few ticks to prevent lag spikes.
+            </dd>
+
+            <dt><div class="parameter">CleanupFlowmapsAfterTicks</div></dt>
+            <dd>The number of ticks that need to pass before all cached and unused flowmaps are deleted to reclaim memory.
+              A negative value means flowmaps will never be deleted once created (as long as the source data has not changed).
+            </dd>
+
           </dl>
         </p>
         <hr>
