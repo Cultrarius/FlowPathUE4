@@ -1,0 +1,701 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+	<meta name="google-site-verification" content="u3p5wqfcrgedq8iU1Cq_wPw3erFY75-NoOoo8phoM4A" />
+    <title>Particle Editor Extension by Cultrarius</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-dark.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  </head>
+  <body>
+    <div id="header">
+      <nav>
+        <li class="fork"><a href="https://www.unrealengine.com/marketplace/particle-editor-extension">View On Marketplace</a></li>
+        <li class="fork"><a href="https://gumroad.com/l/PpRSr">View On Gumroad</a></li>
+      </nav>
+    </div>
+    <!-- end header -->
+    <div class="wrapper">
+      <section>
+        <div id="title">
+          <h1>Particle Editor Extension</h1>
+          <p>Tutorial</p>
+          <hr>
+        </div>
+
+        <h1>
+          <a id="particle-editor-extension-tutorial" class="anchor" href="#particle-editor-extension-tutorial" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Particle Editor Extension Tutorial
+        </h1>
+        <p>This is a tutorial meant to give an introduction for the UE4 particle editor plugin, which can be purchased <a href="https://www.unrealengine.com/marketplace/particle-editor-extension">here</a>.</p>
+
+        <h2>
+          <a id="installation" class="anchor" href="#installation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Installation
+        </h2>
+        <p>Just use the Unreal Engine Launcher, where the plugin should be available in your library after the purchase. If you only have an archive file then extract it to your engine's plugin folder, e.g. "C:\Program Files (x86)\Epic Games\4.13\Engine\Plugins".</p>
+        <p>After the installation, you should see the plugin in your engine's plugin view, like <a href="media/plugins.jpg">this</a>.
+        </p>
+
+        <h2>
+          <a id="usage" class="anchor" href="#usage" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Usage
+        </h2>
+        <p>
+          The following gives an overview of the plugin's modules and how to use them.
+        </p>
+        <h3>Table of contents</h3>
+        <ol>
+          <li><a href="#time">Time settings</a></li>
+          <li><a href="#mesh">Mesh surface</a></li>
+          <li><a href="#custom">Custom logic</a></li>
+          <li><a href="#turbulence">Turbulence</a></li>
+          <li><a href="#galaxy">Spiral galaxy</a></li>
+          <li><a href="#textureColor">Color by texture</a></li>
+          <li><a href="#heightmap">Heightmap</a></li>
+          <li><a href="#sizeBySpeed">Size by speed over time</a></li>
+          <li><a href="#forcePoints">Force points</a></li>
+          <li><a href="#swarm">Swarm movement</a></li>
+          <li><a href="#jiggle">Jiggle movement</a></li>
+          <li><a href="#donut">Donut shape</a></li>
+		      <li><a href="#sortOrder">Translucency sort order</a></li>
+          <li><a href="#decal">Decal component</a></li>
+        </ol>
+        <hr>
+
+        <h3>
+          <a id="time" class="anchor" href="#time" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Time settings</h3>
+        <p>
+          This is not a separate module, but <b>every module</b> of this plugin features three time settings that make it
+          easy to create timed behaviour without using the curve editor (because we all know how much fun that is).
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">StartDelay</div></dt>
+            <dd>The delay in milliseconds that a module is inactive before becoming active.
+              An inactive module will not affect spawned particles or update existing particles.
+              A duration of 0 means the module is never deactivated.</dd>
+
+            <dt><div class="parameter">MaxDuration</div></dt>
+            <dd>The duration in milliseconds that a module is active.
+              After the duration elapsed, the module will no longer affect newly spawned particles or update existing ones.
+              A duration of zero means the module has no limitation on its runtime.</dd>
+
+            <dt><div class="parameter">LoopAfter</div></dt>
+            <dd>The time in ms after which the module's timer is reset,
+             meaning that it again waits for StartDelay milliseconds before it runs for MaxDuration milliseconds.</dd>
+         </dl>
+        </p>
+        <hr>
+
+
+        <h3>
+          <a id="mesh" class="anchor" href="#mesh" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Mesh surface (static and procedural)</h3>
+        <p>
+          This module takes the surface (triangle) data of a given mesh and emits particles on the surface of the mesh.
+          It is possible for the spawned particles to be equally distributed across the surface or to be equally distributed across triangles.
+          They can also optionally start with a velocity in the direction of the surface normal where they spawn.
+
+          Another powerful feature is the possibility to use <b>generated or procedural meshes</b> as input for the emitter.
+          The triangle data for this dynamic type of mesh can either be provided via blueprint or via C++ class.
+        </p>
+        <p>
+          A few implementation notes: for static meshes, the module uses the physX runtime data, as the mesh triangles
+          are not accessible by the CPU in a packaged build. This might cause problems where a custom physics mesh is used.
+          Skeletal meshes are currently not supported; if you want to use them with the plugin then I might be able to add support for them.
+
+          Another thing to remember is that for performance reasons, the complete mesh triangle data must be cached
+          by the emitter. The necessary pre-calculations for the mesh cache are expensive and should not be triggered too often
+          when using procedural meshes.
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/MeshDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/MeshDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          Spawning particles on the surface of a mesh that is generated at runtime works as follows:
+          <ol>
+            <li>Have an actor implement the <span class="code">IMeshDataProvider</span> interface, either in C++ or blueprint.</li>
+            <li>In this actor, override the <span class="code">GetMeshTriangleData</span> method.
+              It must return the mesh data as two lists: 1. a list of vertices and 2. for the triangles a list of indices from the vertices list.
+              Each triangle consists of 3 indices, which reference points from the vertices list.
+            </li>
+            <li>(Optional) If your mesh changes during the lifetime of the particle emitter and you want the emitter to always use
+              the updated mesh, then you also have to override the <span class="code">GetDataRevision</span> method.
+              Just return a higher number every time the mesh data must be updated and the mesh module does the rest.</li>
+            <li>Create your particle emitter with the mesh surface module.</li>
+            <li>Create a name for the <span class="code">DynamicMeshParameterName</span> parameter on the module.</li>
+            <li>Once you spawned your emitter in the game, go to "Instance Parameters" and add an actor parameter
+              with the name from the previous step and the actor from the first step.
+              This can of course also be done via blueprint. For example, the particle emitter could be set as a component
+              of an actor, which sets itself as emitter parameter at the start of the game.
+              This is done by calling the "Set Actor Parameter" function on the particle component of the actor.</li>
+          </ol>
+        </p>
+        <p>
+          Please note that frequent changes of the supplied mesh might hurt performance.
+          The <span class="code">IMeshDataProvider</span> interface was designed in a way that you are
+          in control of the update cycle for genereted mesh data.
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">SurfaceMesh</div></dt>
+            <dd>The static mesh which surface should be used to emit the particles on.</dd>
+
+            <dt><div class="parameter">DynamicMeshParameterName</div></dt>
+            <dd>Parameter for dynamic/procedural generated mesh data.
+              The module will search for a parameter with the given name on the particle component.</br>
+              The parameter must be of type actor and provide an instance of the <span class="code">IMeshDataProvider</span> interface.
+              This is used to inject the triangle data at runtime, e.g. from a pawn.
+
+              <div>This parameter (when found) <b>overrides</b> the <span class="code">SurfaceMesh</span> parameter, so you can use a static mesh to
+              preview the effect in the particle editor and provide a generated mesh at runtime.</div></dd>
+
+            <dt><div class="parameter">MeshTransform</div></dt>
+            <dd>Transformation to use on the mesh vertices.</dd>
+
+            <dt><div class="parameter">EqualTriangeWeight</div></dt>
+            <dd>If true, each triangle has the same chance of spawning a particle, otherwise the triangles are weighted by area.</dd>
+
+            <dt><div class="parameter">VelocityScale</div></dt>
+            <dd>Adds a velocity to each particle in the direction of the normal of the triangle that spawned it.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="custom" class="anchor" href="#custom" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Custom Logic</h3>
+        <p>
+          Sometimes even the awesomeness of this plugin is not enough to satisfy your particle needs.
+          If, for example, you want to place the spawned particles along a bezier curve or color them
+          by velocity then this module is exactly right for you!
+          It allows you to calculate each particle's properties within a blueprint or C++ class.
+        </p>
+        <p>
+          That means you are able to use actual live game data to derive particle properties in your blueprint
+          without the need to add any additional modules inside the particle editor.
+          For example, have a look at this video where the particles are spawned on a sine wave:
+        </p>
+        <p>
+          <iframe width="800" height="450" src="https://www.youtube.com/embed/Y4B-sqgUpgk" frameborder="0" allowfullscreen></iframe>
+        </p>
+        <p>
+          <b>Note:</b> The module is still experimental and WIP (the documentation here is for 4.13 and 4.14 only).
+          In addition, some things like custom colors do not work with GPU particles.
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">DataProviderParameterName</div></dt>
+            <dd>The module will search for a parameter with the given name on the particle component.
+              The parameter must be of type actor and provide an instance of the <span class="code">AParticleDataProvider</span> class.
+              This can be used to provide a custom location, velocity, size, rotation, roation rate or color for
+              spawned and updated particles.</dd>
+
+            <dt><div class="parameter">UpdatedSpawnedParticles</div></dt>
+            <dd>If true, this module is used to update newly spawned particles.</dd>
+
+            <dt><div class="parameter">UpdatedTickedParticles</div></dt>
+            <dd>If true, this module calls the data provider every tick to update the particle data. Does not work with GPU particles.</dd>
+
+            <dt><div class="parameter">UseLocationFromProvider</div></dt>
+            <dd>If true, this module uses the position given by the custom data provider.</dd>
+
+            <dt><div class="parameter">UseVelocityFromProvider</div></dt>
+            <dd>If true, this module uses the velocity given by the custom data provider.</dd>
+
+            <dt><div class="parameter">UseSizeFromProvider</div></dt>
+            <dd>If true, this module updates particles with the size given by the custom data provider.</dd>
+
+            <dt><div class="parameter">UseColorFromProvider</div></dt>
+            <dd>If true, this module uses the color given by the custom data provider.</dd>
+
+            <dt><div class="parameter">UseRotationFromProvider</div></dt>
+            <dd>If true, this module updates particles with the rotation given by the custom data provider.</dd>
+
+            <dt><div class="parameter">UseRotationRateFromProvider</div></dt>
+            <dd>If true, this module updates particles with the rotation rate given by the custom data provider.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="turbulence" class="anchor" href="#turbulence" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Turbulence</h3>
+        <p>
+          This module adds a turbulence effect to the particle's velocity.
+          Usually, this is done with vector fields, which have the advantage to also work with GPU particles.
+          This module is more of a "quick and dirty" solution that can be used if no vector field is at hand
+          or to quickly iterate and try different types of turbulence.<br>
+          <b>Note</b>: watch your performance when applying the effect to many particles at once.
+
+          <div>
+            The turbulence is implemented by calculating a <a href="https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph2007-curlnoise.pdf">3d curl-noise</a> field and applying the field values and direction to the particles.
+            The big advantage curl-noise has over other noise types such as perlin-noise is that there are no "sinks",
+            meaning that particles cannot get trapped in a point in space.
+          </div>
+
+          <div>
+            The module <a href="https://www.youtube.com/watch?v=1I5v5D-qQ-0">works well with ribbons</a>, which show how the noise field is shaped.
+            It is also possible to apply the turbulence only in one or two directions; this can be helpful to create effects like falling snow.
+            See the following video for an example:
+          </div>
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/TurbulenceDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/TurbulenceDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">Intensity</div></dt>
+            <dd>Turbulence intensity in the x, y and z direction - larger values create faster movement. A value of zero disables turbulences for that direction.</dd>
+
+            <dt><div class="parameter">LengthScale</div></dt>
+            <dd>How dense the turbulence field should be (dense = fast changing) - higher values mean less density.</dd>
+
+            <dt><div class="parameter">Tightness</div></dt>
+            <dd>How tightly particles adhere to the turbulence field. 0: act like acceleration, 1: act like velocity.</dd>
+
+            <dt><div class="parameter">MaxAcceleration</div></dt>
+            <dd>Max acceleration gained by turbulence field.</dd>
+
+            <dt><div class="parameter">MaxVelocity</div></dt>
+            <dd>Max particle velocity after turbulence was applied.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="galaxy" class="anchor" href="#galaxy" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Spiral Galaxy</h3>
+        <p>
+          This module uses a spiral shaped distribution model to place newly spawned particles.
+          This can be used to great effect when creating spiral galaxies with GPU particles.</br>
+          <b>Note</b>: since all particles from a single GPU type emitter share the same color,
+          it is required to create several similar emitters within a single particle effect to
+          create a good looking galaxy. See <a href="https://forums.unrealengine.com/showthread.php?77214-Free-Particle-Editor-Module-for-Spiral-Galaxies&p=340895&viewfull=1#post340895">this tutorial</a> for more information
+          or check out the example project.
+        </p>
+        <p>
+          <iframe width="800" height="450" src="https://www.youtube.com/embed/vSL1HahX3h8" frameborder="0" allowfullscreen></iframe>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">StartLocation</div></dt>
+            <dd>The center location where the particles should be emitted.</dd>
+
+            <dt><div class="parameter">Radius</div></dt>
+            <dd>The radius of the spiral. This is a range, meaning that is can be used
+               to block particles from spawning at the center of the spiral, which is very
+               helpful when creating star systems where old stars at the fringe have different colors.
+            </dd>
+
+            <dt><div class="parameter">DeltaAngle</div></dt>
+            <dd>The angle used to determine the twist of the spiral arms.</dd>
+
+            <dt><div class="parameter">EllipseA</div></dt>
+            <dd>Size of the horizontal ellipse</dd>
+
+            <dt><div class="parameter">EllipseB</div></dt>
+            <dd>Size of the vertical ellipse</dd>
+
+            <dt><div class="parameter">DiscHeight</div></dt>
+            <dd>The height of the spiral disc.</dd>
+
+            <dt><div class="parameter">FalloffFactor</div></dt>
+            <dd>A higher falloff factor spreads the particles more to the fringes of the spiral.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="textureColor" class="anchor" href="#textureColor" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Color by texture</h3>
+        <p>
+          This module uses a static texture as a lookup table to adjust the particle color.
+          Each particle within certain bounds is mapped via its position to a texture pixel.
+          This can for example be used to mask spawned particles with the alpha channel of a texture or
+          to have very fine control over the particles color distribution.
+          <p>
+            Particles with a position that cannot be mapped to a texture coordinate are not effected by this module.
+          </p>
+
+          <div>
+            <b>Note</b>: for performance reasons the module has to cache the uncompressed texture data in memory.
+            Creating many effects with large textures can lead to problems.
+          </div>
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/TextureColorDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/TextureColorDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">ColorIndexTexture</div></dt>
+            <dd>Each particle within the module bounds is mapped to a pixel of this texture. The particle color is changed based on the pixel color.
+              <b>The texture must be saved without mipmaps or compression!</b></dd>
+
+            <dt><div class="parameter">MapBounds</div></dt>
+            <dd>The bounds for the module to work in. Only particles with x and y coordinates inside the bounds are affected by this module.
+              Also, the min and max positions of the bounds are mapped to the min and max pixels of the color texture.
+              If the bounds do not seem to work correctly, check if the emitter uses local space or world space.</dd>
+
+            <dt><div class="parameter">Intensity</div></dt>
+            <dd>The value to multiply the texture color with.</dd>
+
+            <dt><div class="parameter">UpdateWithTick</div></dt>
+            <dd>If true, then this module will set the particle color with every update.
+              <b>Does not work for GPU particles.</b></dd>
+
+            <dt><div class="parameter">UseTextureAlpha</div></dt>
+            <dd>If true, then the alpha value will be extracted from the texture and used on the particle as well.</dd>
+
+            <dt><div class="parameter">ParticleAxisToTextureX</div></dt>
+            <dd>The particle position axis to map to the texture's x axis.</dd>
+
+            <dt><div class="parameter">ParticleAxisToTextureY</div></dt>
+            <dd>The particle position axis to map to the texture's y axis.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="heightmap" class="anchor" href="#heightmap" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Heightmap</h3>
+        <p>
+          This module uses a static texture as a heightmap to adjust the particle height.
+          This can for example be used to create particle effects in the shape of maps or to fit an effect to the terrain in a game.
+          <p>
+            Particles with a position that cannot be mapped to a texture coordinate are not effected by this module.
+          </p>
+
+          <div>
+            <b>Note</b>: for performance reasons the module has to cache the uncompressed texture data in memory.
+            Creating many effects with large textures can lead to problems.
+          </div>
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/HeightmapDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/HeightmapDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">HeightmapTexture</div></dt>
+            <dd>RGB texture where the color value (size of the color vector) determines the height of the particle mapped to the texture pixel.
+              <b>The texture must be saved without mipmaps or compression!</b></dd>
+
+            <dt><div class="parameter">MapBounds</div></dt>
+            <dd>The bounds for the heightmap to work in. Only particles with x and y coordinates inside the bounds are affected by this module.
+              Also, the min and max positions of the bounds are mapped to the min and max pixels of the heightmap texture.
+              If the bounds do not seem to work correctly, check if the emitter uses local space or world space.</dd>
+
+            <dt><div class="parameter">Intensity</div></dt>
+            <dd>The value to multiply the heightmap pixel value with for the height.</dd>
+
+            <dt><div class="parameter">UpdateWithTick</div></dt>
+            <dd>If true, then this module will set the particle z-position with every update.
+              This forces to module to no longer be additive to the particles current position, but set an absolute height for the particle.
+              <b>Does not work for GPU particles.</b></dd>
+
+            <dt><div class="parameter">SmoothUpdate</div></dt>
+            <dd>If the tick update is enabled, this option determines if the particles should try to reach the height instantly or smoothly.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="sizeBySpeed" class="anchor" href="#sizeBySpeed" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Size by speed over time</h3>
+        <p>
+          This module is basically the same as the vanilla "size by speed" module, but can change the scale factor over time.
+          It can also be inverted, meaning that faster particles become smaller.
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/SizeBySpeedDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/SizeBySpeedDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">Size</div></dt>
+            <dd>Size scale for each dimension over time.</dd>
+
+            <dt><div class="parameter">InvertSpeed</div></dt>
+            <dd>If true then the particles get smaller the faster they are. A velocity of 0 still results in a size of 0.</dd>
+
+            <dt><div class="parameter">MaxSize</div></dt>
+            <dd>The maximum size the particle can have, regardless of its speed.</dd>
+
+            <dt><div class="parameter">MinSize</div></dt>
+            <dd>The minimum size the particle must have, regardless of its speed.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="forcePoints" class="anchor" href="#forcePoints" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Force points</h3>
+        <p>
+          This module places several "force points" which attract or repel particles based on the distance to the particles.
+          In addition, the module provides different weighting options for the distance: linear, quadratic, inverse linear and inverse quadratic.<br>
+          For example, the linear option works like a rubber band while the inverse quadratic option works like gravity.
+        </p>
+        <p>
+          Keep in mind that every force point acts on every particle, so creating a lot of points and particles might lead to
+          performance problems.
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/ForcePointsDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/ForcePointsDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">Points</div></dt>
+            <dd>The coordinates of the points in space influencing the particles.
+              <b>Attention!</b> Computation time scales linearly with the number of force points.</dd>
+
+            <dt><div class="parameter">Intensity</div></dt>
+            <dd>Magnitude of the acceleration. positive = attract / negative = repel</dd>
+
+            <dt><div class="parameter">SeparationDistanceWeight</div></dt>
+            <dd>Determines how to weight the distance between particles and the points to determine the acceleration. (linear, quadratic, inverse linear or inverse quadratic.)</dd>
+
+            <dt><div class="parameter">DistanceScale</div></dt>
+            <dd>How to scale the distance values before weighting them. This is especially useful when using quadratic weighting.</dd>
+
+			<dt><div class="parameter">DynamicForcePointProviderName</div></dt>
+            <dd>The module will search for a parameter with the given name on the particle component.
+			The parameter must be of type <span class="code">AActor</span> and implement the <span class="code">IForcePointDataProvider</span> interface.
+			This can be used to change the force points at runtime from a blueprint or C++ actor (the method is called each tick).<br>
+			This parameter (when found) overrides the static module parameters, so you can use the module to preview the effect in the particle editor and still provide an actor at runtime.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="swarm" class="anchor" href="#swarm" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Swarm movement</h3>
+        <p>
+          This module adds an <i>experimental</i> swarm behaviour to the particle emitter.
+          Each particle becomes aware of each other particle and tries to fulfill all of the following rules:
+          <ul>
+            <li>Avoid other particles</li>
+            <li>Go in the same direction as the other particles around you</li>
+            <li>Be at the center of the swarm</li>
+            <li>(Optional) Steer towards a user-defined target location</li>
+          </ul>
+          Each rule has a weight behind it, to define how strongly it affects the acceleration of each particle.
+        </p>
+        <p>
+          The module is able to produce a wide variety of behaviours, depending on the settings and particle properties.
+          It can for example be used to simulate birds, fish and insects, but it can also be used for magic effects or smoke columns.
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/SwarmDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/SwarmDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">PerceptionRadius</div></dt>
+            <dd>The influence radius of each swarm particle. The bigger the radius the slower the computations are!</dd>
+
+            <dt><div class="parameter">MaxAcceleration</div></dt>
+            <dd>The maximum acceleration for each particle. Higher values mean faster direction changes.</dd>
+
+            <dt><div class="parameter">MaxVelocity</div></dt>
+            <dd>The maximum velocity for each particle.</dd>
+
+            <dt><div class="parameter">SeparationWeight</div></dt>
+            <dd>Higher values mean particles want to be farther apart.</dd>
+
+            <dt><div class="parameter">AlignmentWeight</div></dt>
+            <dd>Higher values mean particles want to go more in the direction the other particles go.</dd>
+
+            <dt><div class="parameter">CohesionWeight</div></dt>
+            <dd>Higher values mean particles want to be more in the swarms center.</dd>
+
+            <dt><div class="parameter">BlindspotAngleDeg</div></dt>
+            <dd>Defines a volume with a conical shape in the back of each particle where it is "blind", meaning it won't see other particles behind it.</dd>
+
+            <dt><div class="parameter">SeparationDistanceWeight</div></dt>
+            <dd>Determines how to weight the distance between particles for the separation force.</dd>
+
+            <dt><div class="parameter">SteeringTargetDistanceWeight</div></dt>
+            <dd>Determines how to weight the distance between particle and steering target for the attraction force.</dd>
+
+            <dt><div class="parameter">SteeringTargets</div></dt>
+            <dd>This parameter defines fixed attraction points for the swarm particles.
+              Each particle will steer to the nearest target in addition to the usual swarm movement.
+              This can be useful e.g. to limit the swarm to certain bounds.</dd>
+
+            <dt><div class="parameter">SteeringWeight</div></dt>
+            <dd>Higher values mean particles want to go more in the direction of the nearest steering target (if there are any).</dd>
+		  
+            <dt><div class="parameter">DynamicSteeringPointProviderName</div></dt>
+            <dd>The module will search for a parameter with the given name on the particle component.
+			The parameter must be of type <span class="code">AActor</span> and implement the <span class="code">IForcePointDataProvider</span> interface.
+			This can be used to change the force points at runtime from a blueprint or C++ actor (the method is called each tick).<br>
+			This parameter (when found) overrides all other parameters on steering, so you can use the module to preview the effect in the particle editor and still provide an actor at runtime.</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="jiggle" class="anchor" href="#jiggle" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Jiggle Location</h3>
+        <p>
+          This module adds a rapid random movent to each particle each tick.
+          A simple module with a very low runtime cost.
+          The result is something that reminds of insect movement and looks like this:
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/JiggleDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/JiggleDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">Intensity</div></dt>
+            <dd>Jiggle intensity for each dimension over time - larger values jiggle more!</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+          <a id="donut" class="anchor" href="#donut" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Donut Location</h3>
+        <p>
+          This module spawns particles inside a torus shape (a donut).
+          Similar to the other "shape" modules like sphere or cylinder, it allows particles to only spawn on the surface.
+          It also works with GPU particles, as can be seen in the example video:
+        </p>
+        <p>
+          <video controls width="800px">
+            <source src="media/DonutDemo.webm" type='video/webm; codecs="vp8, vorbis"' />
+            Video tag not supported. Download the video <a href="media/DonutDemo.webm">here</a>.
+          </video>
+        </p>
+        <p>
+          <b>Parameters</b>
+          <dl>
+            <dt><div class="parameter">Center</div></dt>
+            <dd>The center of the donut shape; allows for translations to the shape.</dd>
+
+            <dt><div class="parameter">MinRadius</div></dt>
+            <dd>The size of the "hole" in the middle of the shape.</dd>
+
+            <dt><div class="parameter">MaxRadius</div></dt>
+            <dd>The radius of the outer edge of the shape.</dd>
+
+            <dt><div class="parameter">SurfaceOnly</div></dt>
+            <dd>If true, the particles are only spawned on the hull of the donut shape.</dd>
+
+            <dt><div class="parameter">IsFlat</div></dt>
+            <dd>If true, the shape is flattened (all particles have the same z value).</dd>
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
+            <a id="sortOrder" class="anchor" href="#sortOrder" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+              Translucency sort order</h3>
+            <p>
+              This module allows to change the translucency sort order of the particle emitter component.
+    		  This is usually done from the component detail view in the owning actor blueprint, but this is sometimes not possible (e.g. when spawning new actors in sequencer).
+    		  Be ware that this module should only be used once per particle system and overrides the component settings each tick.
+            </p>
+            <p>
+              <b>Parameters</b>
+              <dl>
+                <dt><div class="parameter">SortOrder</div></dt>
+                <dd>Translucent objects with a lower sort priority draw behind objects with a higher priority.
+    			Translucent objects with the same priority are rendered from back-to-front based on their bounds origin.
+    			Ignored if the object is not translucent.  The default priority is zero.<br>
+    			<b>Warning:</b> This should never be set to a non-default value unless you know what you are doing, as it will prevent the renderer from sorting correctly.
+    			It is especially problematic on dynamic gameplay effects.</dd>
+              </dl>
+            </p>
+            <hr>
+
+            <h3>
+              <a id="decal" class="anchor" href="#decal" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+              Decal Component</h3>
+            <p>
+              This module spawns spawns a decal for each particle and moves the decal components around as the particles move around.
+              Make sure to use the correct rotation for the decals, because otherwise the effect will not look very good.
+              <br>
+              To use the particle color for the decal, create a vector input in the decal's material.
+              Then input the material parameter name in the <span class="code">MaterialColorParameter</span> field of the particle module.
+              See the video below for more details.
+            </p>
+            <p>
+              <iframe width="800" height="450" src="https://www.youtube.com/embed/9QgCg3qhRCU" frameborder="0" allowfullscreen></iframe>
+            </p>
+            <p>
+              <b>Parameters</b>
+              <dl>
+                <dt><div class="parameter">DecalMaterials</div></dt>
+                <dd>The materials to create the decals with. One of the materials is chosen randomly for each created decal.</dd>
+
+                <dt><div class="parameter">DecalScale</div></dt>
+                <dd>The size of the created decals.</dd>
+
+                <dt><div class="parameter">DecalRotation</div></dt>
+                <dd>The rotation of the created decals (pitch, yaw and roll in degrees).</dd>
+
+                <dt><div class="parameter">RotateToParticleVelocity</div></dt>
+                <dd>Changes the rotation of the decal each tick, so the forward vector points to the particle velocity.</dd>
+
+                <dt><div class="parameter">SortOrder</div></dt>
+                <dd>Controls the order in which decal elements are rendered.  Higher values draw later (on top).
+                    Setting many different sort orders on many different decals prevents sorting by state and can reduce performance.</dd>
+
+                <dt><div class="parameter">MaterialColorParameter</div></dt>
+                <dd>If not empty then the particles updates the vector parameter with the given name on the decal material with their own color each tick.
+                    This is a workaround since the "particle color" node in the decal material does not produce the linked particle's color.</dd>
+
+                <dt><div class="parameter">OptimizeDecalComponentUsage</div></dt>
+                <dd>If true then decal components will be kept around for some time (invisible) to be reused for newly spawned particles.
+                    Otherwise they will be directly destroyed when a particles is removed.</dd>
+              </dl>
+            </p>
+            <hr>
+
+      </section>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+  </body>
+</html>
