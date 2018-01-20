@@ -82,6 +82,9 @@ TArray<EikonalCellValue> flow::CreateEikonalSurface(const TArray<uint8>& sourceD
                 initializedNodes[index] = true;
             }
             if (node.surfaceCost == BLOCKED) {
+                if (i < 4 || node.parentDirection == -1) {
+                    node.parentDirection = reverseLookup[i];
+                }
                 continue;
             }
 
