@@ -67,6 +67,7 @@
         <ol>
           <li><a href="#intro">How does it work</a></li>
           <li><a href="#setup">Setup (+requirements)</a></li>
+          <li><a href="#agent-config">NavAgent configuration</a></li>
           <li><a href="#manager-config">FlowPathManager configuration</a></li>
           <li><a href="#sources">Sources</a></li>
         </ol>
@@ -105,6 +106,41 @@
         <hr>
 
         <h3>
+          <a id="agent-config" class="anchor" href="#agent-config" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          NavAgent configuration</h3>
+        <p>
+          <p>
+            The <span class="code">NavAgent</span> is the interface implemented by actors that want to move around with the help of the plugin.
+            It allows the <span class="code">FlowPathManager</span>, once registered, to obtain information about the agent's state and update it with movement input.
+            For example, the <span class="code">UFlowPathComponent</span> pawn component implements the <span class="code">NavAgent</span> interface to control and navigate pawns.
+          </p>
+          <p>
+            The following gives a detailed view of the options and methods for the <span class="code">NavAgent</span> interface:
+          </p>
+          <dl>
+            <dt><div class="parameter">GetAgentInfo()</div></dt>
+            <dd>Returns the up-to-date info on this agent. This includes the agent's current location and target in worldspace.
+            </dd>
+
+            <dt><div class="parameter">UpdateAcceleration(FVector2D newAcceleration)</div></dt>
+            <dd>Updates the direction this agent should move to in order to reach its target.
+              The vector is normalized to a length between 0 and 1.
+              The size of the vector is correlated with the velocity the agent should move with, i.e. a smaller vector means the agent should move slower.
+            </dd>
+
+            <dt><div class="parameter">TargetReached()</div></dt>
+            <dd>This method is called once if the agent has reached the target location (within the acceptance radius).
+            </dd>
+
+            <dt><div class="parameter">TargetUnreachable()</div></dt>
+            <dd>This method is called once if the agent has a target location that cannot be reached.
+            </dd>
+
+          </dl>
+        </p>
+        <hr>
+
+        <h3>
           <a id="manager-config" class="anchor" href="#manager-config" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
           FlowPathManager configuration</h3>
         <p>
@@ -113,7 +149,7 @@
             It handles the surface data, path generation and updates the registered agents each tick with new movement input.
           </p>
           <p>
-            The following gives a detailed view of the options and methods for FlowPathManager:
+            The following gives a detailed view of the options and methods for <span class="code">FlowPathManager</span>:
           </p>
           <dl>
             <dt><div class="parameter">tileLength</div></dt>
@@ -153,7 +189,7 @@
 </pre>
               Without the lookahead flowmap generation, an agent standing on tile A will always go just right, because the next tile on its path is tile B to the right.
               With the lookahead flowmap, the agent will try to go directly to tile E (which comes after B as a waypoint) and so goes down and to the right.
-              To generate this lookahead flowmap, date from tiles A, B, D and E is necessary (instead of just A).
+              To generate this lookahead flowmap, data from tiles A, B, D and E is necessary (instead of just A).
               </p>
             </dd>
 
