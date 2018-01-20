@@ -443,18 +443,23 @@ int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPo
     if (nextPortal == nullptr) {
         check(connectedPortal == nullptr);
         if (vector.start.tileLocation != vector.end.tileLocation) {
+            UE_LOG(LogExec, Warning, TEXT("End location tile != start tile location for simple path."));
             return -1;
         }
         // get flowmap to direct target location
         auto tile = tileMap.Find(vector.end.tileLocation);
         if (tile == nullptr) {
+            UE_LOG(LogExec, Warning, TEXT("End location tile (%d, %d) not found."), vector.end.tileLocation.X, vector.end.tileLocation.Y);
             return -1;
         }
-        // TODO add result caching
         // TODO add lookahead if target tile is diagonal start tile
         TArray<FIntPoint> targets = { vector.end.pointInTile };
-        const auto& tileFlowMap = (*tile)->createMapToTarget(targets);
-        return tileFlowMap[cellIndex].directionLookupIndex;
+        const auto& tileFlowMap = (*tile)->createMapToTarget(targets, true);
+        int32 direction = tileFlowMap[cellIndex].directionLookupIndex;
+        if (direction == -1) {
+            UE_LOG(LogExec, Warning, TEXT("Unable to calculate flowmap value for agent"));
+        }
+        return direction;
     }
     else {
         check(connectedPortal != nullptr);
@@ -468,11 +473,29 @@ int32 FlowPath::fastFlowMapLookup(const TileVector& vector, const Portal* nextPo
         auto delta = lookaheadPortal == nullptr ? FIntPoint::ZeroValue : lookaheadPortal->tileCoordinates - vector.start.tileLocation;
         if (delta.SizeSquared() != 2) {
             auto& tileFlowMap = (*tile)->createMapToPortal(nextPortal, connectedPortal);
-            return tileFlowMap[cellIndex].directionLookupIndex;
+            int32 direction = tileFlowMap[cellIndex].directionLookupIndex;
+            if (direction == -1) {
+                for (int32 i = 0; i < 10; i++) {
+                    const EikonalCellValue* v = &tileFlowMap[i * 10];
+                    UE_LOG(LogExec, Warning, TEXT("%f %f %f %f %f %f %f %f %f %f"), v[0].cellValue, v[1].cellValue, v[2].cellValue, v[3].cellValue, v[4].cellValue, v[5].cellValue, v[6].cellValue, v[7].cellValue, v[8].cellValue, v[9].cellValue);
+                }
+                UE_LOG(LogExec, Warning, TEXT("---------------------"));
+                for (int32 i = 0; i < 10; i++) {
+                    const EikonalCellValue* v = &tileFlowMap[i * 10];
+                    UE_LOG(LogExec, Warning, TEXT("%d %d %d %d %d %d %d %d %d %d"), v[0].directionLookupIndex, v[1].directionLookupIndex, v[2].directionLookupIndex, v[3].directionLookupIndex, v[4].directionLookupIndex,
+                        v[5].directionLookupIndex, v[6].directionLookupIndex, v[7].directionLookupIndex, v[8].directionLookupIndex, v[9].directionLookupIndex);
+                }
+                UE_LOG(LogExec, Warning, TEXT("Unable to calculate flowmap value for agent"));
+            }
+            return direction;
         }
         auto dataProvider = createFlowmapDataProvider(vector.start.tileLocation, delta);
         auto& tileFlowMap = (*tile)->createLookaheadFlowmap(nextPortal, lookaheadPortal, dataProvider);
-        return tileFlowMap[cellIndex].directionLookupIndex;
+        int32 direction = tileFlowMap[cellIndex].directionLookupIndex;
+        if (direction == -1) {
+            UE_LOG(LogExec, Warning, TEXT("Unable to calculate flowmap value for agent"));
+        }
+        return direction;
     }
 }
 
@@ -515,102 +538,9 @@ void flow::FlowPath::deleteFlowMapsFromTile(const FIntPoint & tileCoordinates)
     return (*tile)->deleteAllFlowMaps();
 }
 
-bool FlowPath::getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract & result)
+int32 flow::FlowPath::getTileLength() const
 {
-    if (nextPortal == nullptr) {
-        check(connectedPortal == nullptr);
-        if (vector.start.tileLocation != vector.end.tileLocation) {
-            return false;
-        }
-        // get flowmap to direct target location
-        auto tile = tileMap.Find(vector.end.tileLocation);
-        if (tile == nullptr) {
-            return false;
-        }
-        // TODO add result caching
-        TArray<FIntPoint> targets = { vector.end.pointInTile };
-        const auto& tileFlowMap = (*tile)->createMapToTarget(targets);
-        extractPartialFlowmap(vector.start, tileFlowMap, Orientation::NONE, result);
-    }
-    else {
-        check(connectedPortal != nullptr);
-        if (!nextPortal->connected.Contains(connectedPortal) || vector.start.tileLocation != nextPortal->tileCoordinates) {
-            return false;
-        }
-
-        // get flowmap to target portals
-        auto tile = tileMap.Find(vector.start.tileLocation);
-        if (tile == nullptr) {
-            return false;
-        }
-        const auto& tileFlowMap = (*tile)->createMapToPortal(nextPortal, connectedPortal);
-        extractPartialFlowmap(vector.start, tileFlowMap, nextPortal->orientation, result);
-    }
-    return true;
-}
-
-void FlowPath::extractPartialFlowmap(const TilePoint & p, const TArray<EikonalCellValue>& flowMap, Orientation nextPortalOrientation, FlowMapExtract & result) const
-{
-    int32 selfIndex = p.pointInTile.X + p.pointInTile.Y * tileLength;
-    float flowVal = flowMap[selfIndex].cellValue;
-    result.cellValue = flowVal;
-    bool standingOnPortal = flowVal == 0 && nextPortalOrientation != Orientation::NONE;
-
-    for (int32 i = 0; i < 8; i++) {
-        auto neighbor = p.pointInTile + neighbors[i];
-        int32 tileDeltaX = neighbor.X < 0 ? -1 : (neighbor.X >= tileLength ? 1 : 0);
-        int32 tileDeltaY = neighbor.Y < 0 ? -1 : (neighbor.Y >= tileLength ? 1 : 0);
-        if (tileDeltaX == 0 && tileDeltaY == 0) {
-            int32 index = neighbor.X + neighbor.Y * tileLength;
-            result.neighborCells[i] = flowMap[index].cellValue + (standingOnPortal ? 300 : 0);
-        }
-        else {
-            // The neighbor is on another tile, so we have no flowmap for it.
-            // We guess a value based on two things:
-            // 1. don't unnecessary cross tiles (cause that might trigger a new flowmap calculation)
-            // 2. do cross tiles when following portals
-            auto neighborTile = tileMap.Find(p.tileLocation + FIntPoint(tileDeltaX, tileDeltaY));
-            if (neighborTile == nullptr) {
-                result.neighborCells[i] = MAX_VAL;
-                continue;
-            }
-
-            // get the cell value of the neighbor tile
-            neighbor.X = (neighbor.X + tileLength) % tileLength;
-            neighbor.Y = (neighbor.Y + tileLength) % tileLength;
-            int32 index = neighbor.X + neighbor.Y * tileLength;
-            uint8 val = (*neighborTile)->getData()[index];
-
-            // if the cell is blocked then we don't have to check anything
-            if (val == BLOCKED) {
-                result.neighborCells[i] = MAX_VAL;
-                continue;
-            }
-            
-            // check to see if we are following a portal and the neighbor cell is part of the next portal
-            if (standingOnPortal) {
-                if (nextPortalOrientation == Orientation::TOP && tileDeltaX == 0 && tileDeltaY == -1) {
-                    result.neighborCells[i] = val;
-                    continue;
-                }
-                if (nextPortalOrientation == Orientation::BOTTOM && tileDeltaX == 0 && tileDeltaY == 1) {
-                    result.neighborCells[i] = val;
-                    continue;
-                }
-                if (nextPortalOrientation == Orientation::RIGHT && tileDeltaX == 1 && tileDeltaY == 0) {
-                    result.neighborCells[i] = val;
-                    continue;
-                }
-                if (nextPortalOrientation == Orientation::LEFT && tileDeltaX == -1 && tileDeltaY == 0) {
-                    result.neighborCells[i] = val;
-                    continue;
-                }
-            }
-
-            // we use a sufficiently high value so an agent does not go there until it absolutely has to
-            result.neighborCells[i] = val + 500;
-        }
-    }
+    return tileLength;
 }
 
 bool FlowPath::isValidTileLocation(const FIntPoint & p) const
@@ -627,5 +557,3 @@ int32 FlowPath::calcGoalHeuristic(const TilePoint& start, const TilePoint& end) 
     int32 endY = end.tileLocation.Y * tileLength + end.pointInTile.Y;
     return FIntPoint(endX - startX, endY - startY).Size();
 }
-
-
