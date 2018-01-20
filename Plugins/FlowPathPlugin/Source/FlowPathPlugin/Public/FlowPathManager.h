@@ -79,6 +79,9 @@ private:
     TMap<UObject*, AgentData> agents;
     FTransform2D WorldToTileTransform;
     int32 ticksSinceLastCleanup;
+    
+    TSet<FIntPoint> blockedCells;
+    TSet<FIntPoint> reservedCells;
 
     TUniquePtr<FQueuedThreadPool> Pool;
     std::list<FlowMapGenerationTask> generatorTasks;
@@ -88,19 +91,21 @@ private:
 
     void processFlowMapGenerators();
 
-    float calcVelocityBonus(const FVector2D& velocityDirection, int32 i) const;
-
-    float calcWaypointBonus(const FVector2D& waypointDirection, int32 i) const;
+    void normalizeTilePoint(flow::TilePoint& p) const;
 
 protected:
 
-    FVector2D toAbsoluteTileLocation(flow::TilePoint p) const;
+    FIntPoint toAbsoluteTileLocation(flow::TilePoint p) const;
+
+    FVector2D toAbsoluteTileLocationFloat(flow::TilePoint p) const;
 
     FVector2D toTile(FVector2D worldPosition) const;
 
     flow::TilePoint toTilePoint(FVector2D worldPosition) const;
 
     flow::TilePoint absoluteTilePosToTilePoint(FVector2D tilePosition) const;
+
+    TArray<TPair<flow::TilePoint, int32>> getAdjacentFreePoints(const flow::TilePoint& p, int32 direction) const;
 
     bool findClosestWaypoint(const AgentData& data, const flow::TilePoint& agentLocation, flow::TilePoint& result) const;
 
@@ -148,13 +153,11 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     bool MergingPathSearch;
 
-    /** The better a target cell direction aligns with the current agent velocity, the more its value gets boosted by the bonus (ranges from -1 to 1). */
+    /**
+    * If true then agents will try to avoid collisions by steering to nearby free cells and reducing velocity.
+    */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
-    float VelocityBonus;
-
-    /** The better a cell aligns with the next waypoint, the more its value gets boosted by the bonus (ranges from -1 to 1). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
-    float WaypointBonus;
+    bool CollisionChecking;
 
     /**
     * If true then agents with the same goal will reuse each others path search results, which has two benefits:
@@ -177,7 +180,7 @@ public:
     */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = FlowPath)
     int32 CleanupFlowmapsAfterTicks;
-
+    
     AFlowPathManager();
 
 	virtual void Tick(float DeltaTime) override;
@@ -222,15 +225,14 @@ private:
 
     void DebugDrawFlowMaps();
 
+    void DrawPortalWaypoints(AgentData& data);
+
 public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
     bool DrawAllBlockedCells;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
     bool DrawAllPortals;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
-    bool DrawFlowMapAroundAgents;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FlowPath Debug")
     bool DrawAgentPortalWaypoints;

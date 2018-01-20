@@ -16,18 +16,16 @@ AFlowPathManager::AFlowPathManager()
     WorldToTileScale = FVector2D(0.01f, 0.01f);
     AcceptanceRadius = 10;
     tileLength = 10;
-    VelocityBonus = 0.5;
-    WaypointBonus = 0.5;
     LookaheadFlowmapGeneration = true;
     MergingPathSearch = true;
-    GeneratorThreadPoolSize = 8;
+    GeneratorThreadPoolSize = 4;
     MaxAsyncFlowMapUpdatesPerTick = 50;
-    CleanupFlowmapsAfterTicks = 1000;
+    CleanupFlowmapsAfterTicks = 500;
+    CollisionChecking = false;
 
 #if WITH_EDITOR
     DrawAllBlockedCells = false;
     DrawAllPortals = false;
-    DrawFlowMapAroundAgents = false;
     DrawAgentPortalWaypoints = false;
 #endif		// WITH_EDITOR
 
@@ -114,6 +112,30 @@ void AFlowPathManager::DebugDrawFlowMaps()
     }
 }
 
+void AFlowPathManager::DrawPortalWaypoints(AgentData& data)
+{
+    if (DrawAgentPortalWaypoints) {
+        auto inverted = WorldToTileTransform.Inverse();
+        if (data.waypoints.Num() > data.waypointIndex) {
+            auto& first = data.waypoints[data.waypointIndex];
+            auto& last = data.waypoints.Last();
+            FVector2D firstWaypoint = portalCoordToAbsolute(first->center, first->parentTile, tileLength) + FVector2D(0.5, 0.5);
+            FVector2D lastWaypoint = portalCoordToAbsolute(last->center, last->parentTile, tileLength) + FVector2D(0.5, 0.5);
+            DrawDebugDirectionalArrow(GetWorld(), toV3(data.current.agentLocation), toV3(inverted.TransformPoint(firstWaypoint)), 100, FColor::Red, false, -1, 2, 4);
+            DrawDebugDirectionalArrow(GetWorld(), toV3(inverted.TransformPoint(lastWaypoint)), toV3(data.current.targetLocation), 100, FColor::Red, false, -1, 2, 4);
+        }
+        for (int32 i = data.waypointIndex + 1; i < data.waypoints.Num(); i++) {
+            auto& previous = data.waypoints[i - 1];
+            auto& portal = data.waypoints[i];
+
+            // draw the portal connection in red
+            FVector2D startCenter = portalCoordToAbsolute(previous->center, previous->parentTile, tileLength) + FVector2D(0.5, 0.5);
+            FVector2D endCenter = portalCoordToAbsolute(portal->center, portal->parentTile, tileLength) + FVector2D(0.5, 0.5);
+            DrawDebugDirectionalArrow(GetWorld(), toV3(inverted.TransformPoint(startCenter)), toV3(inverted.TransformPoint(endCenter)), 100, FColor::Red, false, -1, 2, 4);
+        }
+    }
+}
+
 #endif		// WITH_EDITOR
 
 void AFlowPathManager::precomputeFlowmaps(const AgentData& data)
@@ -150,7 +172,7 @@ void FlowMapGenerationTask::DoThreadedWork()
     TArray<uint8> sourceData;
     TArray<FIntPoint> targets;
     bool usesLookahead = false;
-
+    
     {
         //TODO this should be a read-write lock for better performance
         FScopeLock lock(&tileLock);
@@ -172,7 +194,7 @@ void FlowMapGenerationTask::DoThreadedWork()
                 Abandon();
             }
             else {
-                nextPortal->parentTile->calculateFlowmapTargets(nextPortal, resultEndPortal, targets);
+                resultStartPortal->parentTile->calculateFlowmapTargets(resultStartPortal, resultEndPortal, targets);
                 if (usesLookahead) {
                     flowPath.createFlowMapSourceData(workingTile, delta, sourceData);
                 }
@@ -187,7 +209,7 @@ void FlowMapGenerationTask::DoThreadedWork()
         result = CreateEikonalSurface(sourceData, targets);
 
         if (result.Num() > 0) {
-            int32 tileLength = FMath::Sqrt(result.Num()) / 2;
+            int32 tileLength = flowPath.getTileLength();
             if (usesLookahead) {
                 // extract the important part from the 2x2 tile
                 auto delta = resultEndPortal->tileCoordinates - workingTile;
@@ -237,11 +259,87 @@ void AFlowPathManager::processFlowMapGenerators()
     }
 }
 
+void AFlowPathManager::Tick(float DeltaTime)
+{
+    SCOPE_CYCLE_COUNTER(STAT_ManagerTick);
+
+    Super::Tick(DeltaTime);
+
+    processFlowMapGenerators();
+
+#if WITH_EDITOR
+    if (DrawAllBlockedCells) {
+        DebugDrawAllBlockedCells();
+    }
+    if (DrawAllPortals) {
+        DebugDrawAllPortals();
+    }
+    if (DrawFlowMaps) {
+        DebugDrawFlowMaps();
+    }
+#endif		// WITH_EDITOR
+
+    TArray<UObject*> agentsToRemove;
+    for (auto& agentPair : agents) {
+        UObject* agent = agentPair.Key;
+        AgentData& data = agentPair.Value;
+
+        if (!agent->IsValidLowLevelFast() || agent->IsPendingKill()) {
+            agentsToRemove.Add(agent);
+            continue;
+        }
+#if WITH_EDITOR
+        DrawPortalWaypoints(data);
+#endif		// WITH_EDITOR
+
+        data.lastTick = data.current;
+        data.lastLocation = data.currentLocation;
+        data.lastTarget = data.currentTarget;
+        data.current = INavAgent::Execute_GetAgentInfo(agent);
+        data.currentLocation = toTilePoint(data.current.agentLocation);
+        data.currentTarget = toTilePoint(data.current.targetLocation);
+        blockedCells.Add(toAbsoluteTileLocation(data.currentLocation));
+
+        bool isActive = data.current.isPathfindingActive;
+        if (isActive) {
+            if ((data.current.targetLocation - data.current.agentLocation).SizeSquared() <= (AcceptanceRadius * AcceptanceRadius)) {
+                // agent has reached the goal
+                data.current.isPathfindingActive = false;
+                data.isPathDataDirty = false;
+                data.targetAcceleration = FVector2D::ZeroVector;
+                data.waypoints.Empty();
+                INavAgent::Execute_TargetReached(agent);
+            }
+            else if (!data.lastTick.isPathfindingActive) {
+                // agent just started the pathfinding
+                data.isPathDataDirty = true;
+                data.targetAcceleration = FVector2D::ZeroVector;
+                data.waypoints.Empty();
+            }
+            else if (!data.isPathDataDirty) {
+                INavAgent::Execute_UpdateAcceleration(agent, data.targetAcceleration);
+                data.isPathDataDirty = data.currentLocation != data.lastLocation || data.currentTarget != data.lastTarget;
+
+                if (CollisionChecking) {
+                    auto nextTarget = toAbsoluteTileLocationFloat(data.currentLocation) + data.targetAcceleration;
+                    reservedCells.Add(FIntPoint(nextTarget.X, nextTarget.Y));
+                }
+            }
+        }
+    }
+
+    for (auto agent : agentsToRemove) {
+        agents.Remove(agent);
+    }
+
+    updateDirtyPathData();
+    cleanupOldFlowmaps();
+}
+
 void AFlowPathManager::updateDirtyPathData()
 {
     SCOPE_CYCLE_COUNTER(STAT_ManagerDirtyPaths);
 
-    FlowMapExtract flowMap;
     for (auto& agentPair : agents) {
         AgentData& data = agentPair.Value;
         if (!data.current.isPathfindingActive || !data.isPathDataDirty) {
@@ -251,7 +349,7 @@ void AFlowPathManager::updateDirtyPathData()
         auto& target = data.currentTarget;
 
         // check and update the portal waypoint data
-        bool isWaypointDataDirty = target != data.lastTarget;
+        bool isWaypointDataDirty = target != data.lastTarget || (data.waypointIndex >= data.waypoints.Num() && location.tileLocation != target.tileLocation);
         if (!isWaypointDataDirty && data.waypoints.Num() > 0 && data.waypoints.Num() > data.waypointIndex) {
             if (data.waypoints[data.waypointIndex + 1]->tileCoordinates == location.tileLocation) {
                 data.waypointIndex += 2;
@@ -284,105 +382,67 @@ void AFlowPathManager::updateDirtyPathData()
         }
 
         int32 lookupIndex = flowPath->fastFlowMapLookup({ location, target }, nextPortal, connectedPortal, lookaheadPortal);
-        if (lookupIndex >= 0) {
-            data.targetAcceleration = normalizedNeighbors[lookupIndex];
-        } else if (flowPath->getFlowMapValue({ location, target }, nextPortal, connectedPortal, flowMap)) {
-            float bestTarget = MAX_VAL;
-            FVector2D targetDirection = FVector2D::ZeroVector;
-            FVector2D agentVelocity = (data.current.agentLocation - data.lastTick.agentLocation).GetSafeNormal();
-            TilePoint expectedWaypoint;
-            if (!findClosestWaypoint(data, location, expectedWaypoint)) {
-                expectedWaypoint = target;
-            }
-            FVector2D waypointDirection = (toAbsoluteTileLocation(expectedWaypoint) - toAbsoluteTileLocation(location)).GetSafeNormal();
-            float min = MAX_VAL;
-            float max = 0;
-            TArray<int32> candidates;
-            //UE_LOG(LogExec, Error, TEXT("-------"));
-            for (int32 i = 0; i < 8; i++) {
-                float cellValue = flowMap.neighborCells[i];
-                if (cellValue == MAX_VAL) {
-                    continue;
-                }
-                if (VelocityBonus != 0 && agentVelocity != FVector2D::ZeroVector) {
-                    cellValue -= calcVelocityBonus(agentVelocity, i);
-                }
-                if (WaypointBonus != 0) {
-                    cellValue -= calcWaypointBonus(waypointDirection, i);
-                }
-                if (cellValue < bestTarget) {
-                    bestTarget = cellValue;
-                    candidates.Empty(1);
-                    candidates.Add(i);
-                }
-                else if (bestTarget != MAX_VAL && cellValue == bestTarget) {
-                    candidates.Add(i);
-                }
-                min = FMath::Min(min, cellValue);
-                max = cellValue == MAX_VAL ? max : FMath::Max(max, cellValue);
-            }
-
-            if (candidates.Num() == 1) {
-                targetDirection = normalizedNeighbors[candidates[0]];
-            }
-            else if (candidates.Num() > 1) {
-                // we have multiple identical cell values to choose from, pick the one that is best without the applied bonuses
-                bestTarget = MAX_VAL;
-                for (int32 i = 0; i < candidates.Num(); i++) {
-                    int32 index = candidates[i];
-                    float cellValue = flowMap.neighborCells[index];
-                    if (cellValue < bestTarget) {
-                        bestTarget = cellValue;
-                        targetDirection = normalizedNeighbors[index];
-                    }
-                }
-            }
-
-#if WITH_EDITOR
-            if (DrawFlowMapAroundAgents) {
-                auto inverted = WorldToTileTransform.Inverse();
-                int32 absoluteX = location.tileLocation.X * tileLength + location.pointInTile.X;
-                int32 absoluteY = location.tileLocation.Y * tileLength + location.pointInTile.Y;
-                FVector2D centerPoint(absoluteX + 0.5, absoluteY + 0.5);
-                auto tileCenter = toV3(inverted.TransformPoint(centerPoint));
-                for (int32 i = 0; i < 8; i++) {
-                    float cellValue = flowMap.neighborCells[i];
-                    auto neighborDirection = toV3(inverted.TransformPoint(normalizedNeighbors[i] / 2));
-                    float alpha = FMath::Clamp((cellValue - min) / (max - min + 1), 0.0f, 1.0f);
-                    FColor color = cellValue == MAX_VAL ? FColor::Purple : FMath::Lerp(FLinearColor::Green, FLinearColor::Red, alpha).ToFColor(false);
-                    DrawDebugDirectionalArrow(GetWorld(), tileCenter, tileCenter + neighborDirection, 100, color, true, -1, 2, 4);
-                }
-            }
-#endif		// WITH_EDITOR
-
-            data.targetAcceleration = FVector2D(targetDirection.X, targetDirection.Y);
-        }
-        else {
+        if (lookupIndex < 0) {
+            UE_LOG(LogExec, Warning, TEXT("Unable to calculate flowmap value for agent %s"), *agentPair.Key->GetName());
             data.current.isPathfindingActive = false;
             data.targetAcceleration = FVector2D::ZeroVector;
+            data.isPathDataDirty = false;
+            data.waypoints.Empty();
+            INavAgent::Execute_TargetUnreachable(agentPair.Key);
+            continue;
+        }
+
+        if (!CollisionChecking) {
+            data.targetAcceleration = normalizedNeighbors[lookupIndex];
+        } else {
+            auto absLocation = toAbsoluteTileLocation(data.currentLocation);
+            auto nextLocation = absLocation + neighbors[lookupIndex];
+            if (!blockedCells.Contains(nextLocation) && !reservedCells.Contains(nextLocation)) {
+                data.targetAcceleration = normalizedNeighbors[lookupIndex];
+            } else {
+                // the target we want to steer to is blocked by another agent, so we try to steer to an adjacent tile if possible
+                bool foundAlternative = false;
+                for (auto& alternative : getAdjacentFreePoints(data.currentLocation, lookupIndex)) {
+                    absLocation = toAbsoluteTileLocation(alternative.Key);
+                    if (blockedCells.Contains(absLocation)) {
+                        continue;
+                    }
+                    if (reservedCells.Contains(absLocation)) {
+                        lookupIndex = alternative.Value;
+                        foundAlternative = true;
+                        continue;
+                    }
+                    lookupIndex = alternative.Value;
+                    foundAlternative = true;
+                    break;
+                }
+                if (foundAlternative) {
+                    // reserved cells are avoided as much as possible, but sometimes they are the only things left
+                    data.targetAcceleration = normalizedNeighbors[lookupIndex];
+                }
+                else {
+                    // If we steer to a blocked cell without any alternative we slow down
+                    data.targetAcceleration = normalizedNeighbors[lookupIndex] * 0.2f;
+                }
+            }
+
+            auto nextTarget = toAbsoluteTileLocationFloat(data.currentLocation) + data.targetAcceleration;
+            reservedCells.Add(FIntPoint(nextTarget.X, nextTarget.Y));
         }
 
         data.isPathDataDirty = false;
+        INavAgent::Execute_UpdateAcceleration(agentPair.Key, data.targetAcceleration);
     }
 }
 
-float AFlowPathManager::calcVelocityBonus(const FVector2D& velocityDirection, int32 i) const
+FIntPoint AFlowPathManager::toAbsoluteTileLocation(TilePoint p) const
 {
-    float distance = (velocityDirection - normalizedNeighbors[i]).Size();
-    float bonus = (-distance + 1) * VelocityBonus;
-    //UE_LOG(LogExec, Error, TEXT("Velocity %f, %f / Vector %f, %f / Bonus %f / Distance %f"), velocityDirection.X, velocityDirection.Y, normalizedNeighbors[i].X, normalizedNeighbors[i].Y, bonus, distance);
-    return bonus;
+    int32 absoluteX = p.tileLocation.X * tileLength + p.pointInTile.X;
+    int32 absoluteY = p.tileLocation.Y * tileLength + p.pointInTile.Y;
+    return FIntPoint(absoluteX, absoluteY);
 }
 
-float AFlowPathManager::calcWaypointBonus(const FVector2D& waypointDirection, int32 i) const
-{
-    float distance = (waypointDirection - normalizedNeighbors[i]).Size();
-    float bonus = (-distance + 1) * WaypointBonus;
-    //UE_LOG(LogExec, Error, TEXT("Waypoint %f, %f / Vector %f, %f / Bonus %f / Distance %f"), waypointDirection.X, waypointDirection.Y, normalizedNeighbors[i].X, normalizedNeighbors[i].Y, bonus, distance);
-    return bonus;
-}
-
-FVector2D AFlowPathManager::toAbsoluteTileLocation(flow::TilePoint p) const
+FVector2D AFlowPathManager::toAbsoluteTileLocationFloat(TilePoint p) const
 {
     int32 absoluteX = p.tileLocation.X * tileLength + p.pointInTile.X;
     int32 absoluteY = p.tileLocation.Y * tileLength + p.pointInTile.Y;
@@ -409,7 +469,49 @@ TilePoint AFlowPathManager::absoluteTilePosToTilePoint(FVector2D tilePos) const
     return { FIntPoint(tileX, tileY), FIntPoint(x, y) };
 }
 
-bool AFlowPathManager::findClosestWaypoint(const AgentData& data, const flow::TilePoint& agentLocation, TilePoint& result) const
+void AFlowPathManager::normalizeTilePoint(TilePoint& p) const {
+    while (p.pointInTile.X < 0) {
+        p.tileLocation.X--;
+        p.pointInTile.X += tileLength;
+    }
+    while (p.pointInTile.X >= tileLength) {
+        p.tileLocation.X++;
+        p.pointInTile.X -= tileLength;
+    }
+    while (p.pointInTile.Y < 0) {
+        p.tileLocation.Y--;
+        p.pointInTile.Y += tileLength;
+    }
+    while (p.pointInTile.Y >= tileLength) {
+        p.tileLocation.Y++;
+        p.pointInTile.Y -= tileLength;
+    }
+}
+
+TArray<TPair<TilePoint, int32>> AFlowPathManager::getAdjacentFreePoints(const TilePoint& p, int32 direction) const
+{
+    TArray<TPair<TilePoint, int32>> adjacent;
+
+    TilePoint alternative = p;
+    int32 alternativeDir = leftDirectionLookup[direction];
+    alternative.pointInTile += neighbors[alternativeDir];
+    normalizeTilePoint(alternative);
+    if (flowPath->getDataFor(alternative) != BLOCKED) {
+        adjacent.Emplace(alternative, alternativeDir);
+    }
+    
+    alternative = p;
+    alternativeDir = rightDirectionLookup[direction];
+    alternative.pointInTile += neighbors[alternativeDir];
+    normalizeTilePoint(alternative);
+    if (flowPath->getDataFor(alternative) != BLOCKED) {
+        adjacent.Emplace(alternative, alternativeDir);
+    }
+
+    return adjacent;
+}
+
+bool AFlowPathManager::findClosestWaypoint(const AgentData& data, const TilePoint& agentLocation, TilePoint& result) const
 {
     int32 index = data.waypointIndex;
     int32 count = data.waypoints.Num();
@@ -436,98 +538,6 @@ bool AFlowPathManager::findClosestWaypoint(const AgentData& data, const flow::Ti
         return true;
     }
     return false;
-}
-
-void AFlowPathManager::Tick(float DeltaTime)
-{
-    SCOPE_CYCLE_COUNTER(STAT_ManagerTick);
-
-    Super::Tick(DeltaTime);
-
-    processFlowMapGenerators();
-
-#if WITH_EDITOR
-    if (DrawAllBlockedCells) {
-        DebugDrawAllBlockedCells();
-    }
-    if (DrawAllPortals) {
-        DebugDrawAllPortals();
-    }
-    if (DrawFlowMaps) {
-        DebugDrawFlowMaps();
-    }
-#endif		// WITH_EDITOR
-
-    TArray<UObject*> agentsToRemove;
-    for (auto& agentPair : agents) {
-        UObject* agent = agentPair.Key;
-        AgentData& data = agentPair.Value;
-
-        if (!agent->IsValidLowLevelFast() || agent->IsPendingKill()) {
-            agentsToRemove.Add(agent);
-            continue;
-        }
-
-#if WITH_EDITOR
-        if (DrawAgentPortalWaypoints) {
-            auto inverted = WorldToTileTransform.Inverse();
-            if (data.waypoints.Num() > data.waypointIndex) {
-                auto& first = data.waypoints[data.waypointIndex];
-                auto& last = data.waypoints.Last();
-                FVector2D firstWaypoint = portalCoordToAbsolute(first->center, first->parentTile, tileLength) + FVector2D(0.5, 0.5);
-                FVector2D lastWaypoint = portalCoordToAbsolute(last->center, last->parentTile, tileLength) + FVector2D(0.5, 0.5);
-                DrawDebugDirectionalArrow(GetWorld(), toV3(data.current.agentLocation), toV3(inverted.TransformPoint(firstWaypoint)), 100, FColor::Red, false, -1, 2, 4);
-                DrawDebugDirectionalArrow(GetWorld(), toV3(inverted.TransformPoint(lastWaypoint)), toV3(data.current.targetLocation), 100, FColor::Red, false, -1, 2, 4);
-            }
-            for (int32 i = data.waypointIndex + 1; i < data.waypoints.Num(); i++) {
-                auto& previous = data.waypoints[i - 1];
-                auto& portal = data.waypoints[i];
-
-                // draw the portal connection in red
-                FVector2D startCenter = portalCoordToAbsolute(previous->center, previous->parentTile, tileLength) + FVector2D(0.5, 0.5);
-                FVector2D endCenter = portalCoordToAbsolute(portal->center, portal->parentTile, tileLength) + FVector2D(0.5, 0.5);
-                DrawDebugDirectionalArrow(GetWorld(), toV3(inverted.TransformPoint(startCenter)), toV3(inverted.TransformPoint(endCenter)), 100, FColor::Red, false, -1, 2, 4);
-            }
-        }
-#endif		// WITH_EDITOR
-
-        data.lastTick = data.current;
-        data.lastLocation = data.currentLocation;
-        data.lastTarget = data.currentTarget;
-        data.current = INavAgent::Execute_GetAgentInfo(agent);
-        data.currentLocation = toTilePoint(data.current.agentLocation);
-        data.currentTarget = toTilePoint(data.current.targetLocation);
-
-        bool isActive = data.current.isPathfindingActive;
-        if (isActive) {
-            if ((data.current.targetLocation - data.current.agentLocation).SizeSquared() <= (AcceptanceRadius * AcceptanceRadius)) {
-                // agent has reached the goal
-                data.current.isPathfindingActive = false;
-                data.isPathDataDirty = false;
-                data.targetAcceleration = FVector2D::ZeroVector;
-                data.waypoints.Empty();
-                INavAgent::Execute_TargetReached(agent);
-            }
-            else if (!data.lastTick.isPathfindingActive) {
-                // agent just started the pathfinding
-                data.isPathDataDirty = true;
-                data.targetAcceleration = FVector2D::ZeroVector;
-                data.waypoints.Empty();
-            }
-            else if (!data.isPathDataDirty) {
-                INavAgent::Execute_UpdateAcceleration(agent, data.targetAcceleration);
-                data.isPathDataDirty = data.currentLocation != data.lastLocation || data.currentTarget != data.lastTarget;
-            }
-        }
-    }
-
-    for (auto agent : agentsToRemove) {
-        agents.Remove(agent);
-    }
-
-    updateDirtyPathData();
-    cleanupOldFlowmaps();
-    
 }
 
 void AFlowPathManager::cleanupOldFlowmaps()
@@ -596,7 +606,7 @@ bool AFlowPathManager::UpdateMapTileLocal(int32 tileX, int32 tileY, const TArray
     if (success) {
         // remove invalidated waypoint data
         for (auto& data : agents) {
-            TSet<const flow::Portal*> waypointPortals;
+            TSet<const Portal*> waypointPortals;
             waypointPortals.Append(data.Value.waypoints);
             for (auto& oldPortal : originalTilePortals) {
                 if (waypointPortals.Contains(oldPortal)) {

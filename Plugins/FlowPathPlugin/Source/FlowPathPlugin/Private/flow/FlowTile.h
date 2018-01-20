@@ -44,6 +44,36 @@ namespace flow {
         }
     };
 
+    struct FlowTargetKey {
+        TSet<FIntPoint> targets;
+
+        FlowTargetKey(const TArray<FIntPoint>& targetArray) {
+            targets.Append(targetArray);
+        }
+
+        bool operator==(const FlowTargetKey& Other) const
+        {
+            if (targets.Num() != Other.targets.Num()) {
+                return false;
+            }
+            for (auto& p : targets) {
+                if (!Other.targets.Contains(p)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        friend uint32 GetTypeHash(const FlowTargetKey& Other)
+        {
+            uint32 hash = 0;
+            for (auto& p : Other.targets) {
+                hash = HashCombine(hash, GetTypeHash(p));
+            }
+            return hash;
+        }
+    };
+
     int32 toFourTileIndex(bool isRight, bool isDown, int32 x, int32 y, int32 tileLength);
 
     int32 toDirectionIndex(Orientation facing);
@@ -60,7 +90,8 @@ namespace flow {
         FIntPoint coordinates;
         int32 tileLength;
         TArray<Portal> portals;
-        TMap<FlowPortalKey, TArray<EikonalCellValue>> eikonalMaps;
+        TMap<FlowPortalKey, TArray<EikonalCellValue>> portalEikonalMaps;
+        TMap<FlowTargetKey, TArray<EikonalCellValue>> directEikonalMaps;
 
         void initPortalData();
 
@@ -104,7 +135,7 @@ namespace flow {
 
         const TArray<EikonalCellValue>& createLookaheadFlowmap(const Portal* targetPortal, const Portal* lookaheadPortal, std::function<void(TArray<uint8>&)> dataProvider);
 
-        TArray<EikonalCellValue> createMapToTarget(const TArray<FIntPoint>& targets);
+        TArray<EikonalCellValue> createMapToTarget(const TArray<FIntPoint>& targets, bool cacheResult);
 
         TArray<TArray<EikonalCellValue>> getAllFlowMaps() const;
 

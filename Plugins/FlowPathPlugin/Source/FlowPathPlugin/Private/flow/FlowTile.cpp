@@ -317,15 +317,15 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
     check(connectedPortal);
     check(targetPortal->connected.Contains(connectedPortal));
     FlowPortalKey key = { targetPortal, connectedPortal };
-    if (eikonalMaps.Contains(key)) {
-        return eikonalMaps[key];
+    if (portalEikonalMaps.Contains(key)) {
+        return portalEikonalMaps[key];
     }
     {
         SCOPE_CYCLE_COUNTER(STAT_TilePortalFlowmap);
 
         TArray<FIntPoint> targets;
         calculateFlowmapTargets(targetPortal, connectedPortal, targets);
-        auto resultMap = createMapToTarget(targets);
+        auto resultMap = createMapToTarget(targets, false);
         for (auto p : targets) {
             // For non-portal target points the direction lookups are invalid.
             // We change them for the portal window, so that an agent will pass to the next tile.
@@ -333,7 +333,7 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
             resultMap[index].directionLookupIndex = toDirectionIndex(targetPortal->orientation);
         }
 
-        return eikonalMaps.Add(key, resultMap);
+        return portalEikonalMaps.Add(key, resultMap);
     }
 }
 
@@ -394,8 +394,8 @@ const TArray<EikonalCellValue>& flow::FlowTile::createLookaheadFlowmap(const Por
     check(targetPortal);
     check(lookaheadPortal);
     FlowPortalKey key = { targetPortal, lookaheadPortal };
-    if (eikonalMaps.Contains(key)) {
-        return eikonalMaps[key];
+    if (portalEikonalMaps.Contains(key)) {
+        return portalEikonalMaps[key];
     }
 
     {
@@ -433,25 +433,37 @@ const TArray<EikonalCellValue>& flow::FlowTile::createLookaheadFlowmap(const Por
             }
         }
 
-        return eikonalMaps.Add(key, extractedMap);
+        return portalEikonalMaps.Add(key, extractedMap);
     }
 }
 
-TArray<EikonalCellValue> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets)
+TArray<EikonalCellValue> flow::FlowTile::createMapToTarget(const TArray<FIntPoint>& targets, bool cacheResult)
 {
+    if (cacheResult) {
+        FlowTargetKey key(targets);
+        auto cachedEntry = directEikonalMaps.Find(key);
+        if (cachedEntry != nullptr) {
+            return *cachedEntry;
+        }
+        return directEikonalMaps.Add(key, CreateEikonalSurface(getData(), targets));
+    }
     return CreateEikonalSurface(getData(), targets);
 }
 
 TArray<TArray<EikonalCellValue>> flow::FlowTile::getAllFlowMaps() const
 {
     TArray<TArray<EikonalCellValue>> result;
-    eikonalMaps.GenerateValueArray(result);
+    TArray<TArray<EikonalCellValue>> tmp;
+    portalEikonalMaps.GenerateValueArray(tmp);
+    result.Append(tmp);
+    directEikonalMaps.GenerateValueArray(tmp);
+    result.Append(tmp);
     return result;
 }
 
 bool flow::FlowTile::hasFlowMap(const Portal * startPortal, const Portal * targetPortal) const
 {
-    return eikonalMaps.Contains({ startPortal, targetPortal });
+    return portalEikonalMaps.Contains({ startPortal, targetPortal });
 }
 
 void flow::FlowTile::cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result)
@@ -459,12 +471,12 @@ void flow::FlowTile::cacheFlowMap(const Portal * resultStartPortal, const Portal
     if (result.Num() != tileLength * tileLength) {
         return;
     }
-    eikonalMaps.Add({ resultStartPortal, resultEndPortal }, result);
+    portalEikonalMaps.Add({ resultStartPortal, resultEndPortal }, result);
 }
 
 void flow::FlowTile::deleteAllFlowMaps()
 {
-    eikonalMaps.Empty();
+    portalEikonalMaps.Empty();
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const

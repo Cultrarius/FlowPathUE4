@@ -56,11 +56,6 @@ namespace flow {
         TilePoint end;
     };
 
-    struct FlowMapExtract {
-        float cellValue;
-        float neighborCells[8];
-    };
-
     struct PortalLink {
         const Portal* fromPortal;
         const Portal* toPortal;
@@ -87,8 +82,6 @@ namespace flow {
         bool isValidTileLocation(const FIntPoint& p) const;
 
         int32 calcGoalHeuristic(const TilePoint& start, const TilePoint& end) const;
-
-        void extractPartialFlowmap(const TilePoint& p, const TArray<EikonalCellValue>& flowMap, Orientation nextPortalOrientation, FlowMapExtract& result) const;
 
         PortalSearchResult checkCache(const Portal* start, const FIntPoint& absoluteTarget) const;
 
@@ -121,8 +114,6 @@ namespace flow {
 
         TMap<FIntPoint, TArray<TArray<EikonalCellValue>>> getAllFlowMaps() const;
 
-        bool getFlowMapValue(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, FlowMapExtract& result);
-
         int32 fastFlowMapLookup(const TileVector& vector, const Portal* nextPortal, const Portal* connectedPortal, const Portal* lookaheadPortal);
 
         bool hasFlowMap(const Portal* startPortal, const Portal* targetPortal) const;
@@ -132,5 +123,7 @@ namespace flow {
         void cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result);
 
         void deleteFlowMapsFromTile(const FIntPoint& tileCoordinates);
+
+        int32 getTileLength() const;
     };
 }

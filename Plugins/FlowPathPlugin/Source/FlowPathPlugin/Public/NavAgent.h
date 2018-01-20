@@ -26,6 +26,14 @@ struct FAgentInfo
     /** The target the agent is trying to reach. */
     UPROPERTY(EditAnywhere, Category = "FlowPath", meta = (EditCondition = "isPathfindingActive"))
         FVector2D targetLocation;
+
+    /** 
+     * The id of the group the agent belongs to. Any positive integer indicates that this agent is part of a group.
+     * Groups have a cohesive behavior, so members of the group try to be near each other if possible.
+     * Members of a group should always have the same (or close by) targets.
+     */
+    UPROPERTY(EditAnywhere, Category = "FlowPath", meta = (EditCondition = "isPathfindingActive"))
+        int32 groupID = -1;
 };
 
 UINTERFACE(BlueprintType)
