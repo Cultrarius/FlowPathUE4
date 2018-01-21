@@ -101,7 +101,29 @@
         </p>
         <p>
           <b>Getting started</b>
-          # TODO add screenshots and example project link?
+          <p>
+            # TODO add screenshots and example project link?
+            <ol>
+              <li># ADD MANAGER</li>
+              <br>
+              <li>Next, we need to make the <span class="code">FlowPathManager</span> aware of our pawns.
+                In our pawn's blueprint we add the <span class="code">FlowPath Component</span> to it:<br>
+               <img src="media/FlowPathComponent.jpg" alt="FlowPathComponent"><br>
+              </li>
+              <br>
+              <li>We have to enable the component at the start of the game by providing it with a <span class="code">FlowPathManager</span>.
+                You can have several managers, e.g. for different players or for different types of units (sea units have a different manager than land units).
+                The component automatically registers itself with the manager and updates the pawn with the movement input.
+                You can use the following code if you have just one global manager is your map:
+                <img src="media/SetComponentManager.jpg" alt="SetComponentManager"><br>
+              </li>
+              <br>
+              <li>We can then use the component's <span class="code">MovePawnToTarget</span> method to set a target for our pawn.
+                For example, to move all pawns to a point on the ground when the left mouse button is clicked, you can do the following:
+                <img src="media/MoveOnLeftClick.jpg" alt="MoveOnLeftClick"><br>
+              </li>
+            </ol>
+          </p>
         </p>
         <hr>
 
