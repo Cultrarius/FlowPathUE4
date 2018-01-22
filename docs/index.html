@@ -106,7 +106,36 @@
             <ol>
               <li># ADD MANAGER</li>
               <br>
-              <li># INITIALIZE DATA</li>
+              <li>One of the most important parts of a good navigation outcome is good surface data quality.
+                The whole navigable area is divided into tiles, which are divided into individual cells with a cost value:<br>
+                <img src="media/surface.svg" alt="surface"><br>
+                <p>
+                  Cells can have a cost value between 1 and 255 (0 is reserved and not allowed).
+                  A avlue of 1 means basically free traversal and 254 has the highest traversal cost possible.
+                  A value of 255 means that a cell is <b>blocked</b> and cannot be traversed.
+                </p>
+                <p>
+                  It is advisable to avoid very sharp jumps of cost values and have instead cost gradients.
+                  See the above example: the easy to traverse cells never directly touch the blocked cells, but have a gradient of hard to traverse cells instead.
+                  This leads to more naturally looking paths (you don't try to hug any walls while walking) and prevents agents from colliding easily with blocked areas.
+                  Depending on the velocity of the agents, the "buffer zone" of high-cost cells around a blocked area can even be more than one cell wide.
+                </p>
+                <p>
+                  At the start of the game, you supply the <span class="code">FlowPathManager</span> with all the individual tiles.
+                  The data for each tile is given as a continuous array of values between 1 and 255.
+                  During the game, new tiles can be added or existing tiles updated.
+                  Note that single cells cannot be directly updated, it is only possible to replace complete tiles.
+                  To update a single tile, use the methods <span class="code">UpdateMapTileWorld()</span> or
+                  <span class="code">UpdateMapTileLocal()</span> on a <span class="code">FlowPathManager</span> instance.
+                </p>
+                <p>
+                  If the map data is known at development time (i.e. the map is not procedurally generated) then one very convenient way to provide the data is via texture.
+                  This has the added benefit that the cost data can be inspected and manipulated with software such as <a href="https://www.gimp.org/">GIMP</a>.
+                  That way you can also easily add effects such as blurring to the cost data to give the map a more natural feel.
+                  To create the surface data from a texture, use the method <span class="code">UpdateMapTilesFromTexture()</span>
+                  on a <span class="code">FlowPathManager</span> instance.
+                </p>
+              </li>
               <br>
               <li>Next, we need to make the <span class="code">FlowPathManager</span> aware of our pawns.
                 In our pawn's blueprint we add the <span class="code">FlowPath Component</span> to it:<br>
