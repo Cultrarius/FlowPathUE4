@@ -102,9 +102,32 @@
         <p>
           <b>Getting started</b>
           <p>
-            # TODO add screenshots and example project link?
             <ol>
-              <li># ADD MANAGER</li>
+              <li>
+                <p>
+                  The central class of the plugin's API is <span class="code">FlowPathManager</span>, which has to be instanciated as an actor in the level.
+                  To do that, create a new blueprint or C++ class that extends <span class="code">FlowPathManager</span>:<br>
+                  <img src="media/CreateManagerBP.jpg" alt="CreateManagerBP"><br>
+                  Next, give your custom manager a fancy name and add it to the level:<br>
+                  <img src="media/AddManagerToLevel.jpg" alt="AddManagerToLevel"><br>
+                  When the game begins (and every time you want to change the tile size during the game), the manager must be initialized.
+                  During the initialization, the manager prepares the necessary data structures, creates threads for async flowmap generation and reads the config parameters.
+                  After the initialization, the manager can be filled with surface data (more on that later).
+                  In this example, I initialize the manager after the game begins and initialize it from a greyscale texture:<br>
+                  <img src="media/InitManagerWithTexture.jpg" alt="InitManagerWithTexture"><br>
+                </p>
+                <p>
+                  To represent my level's geometry, I added a simple flat mesh to the level and slapped the surface cost texture on it:<br>
+                  <img src="media/CubeGround.jpg" alt="CubeGround"><br>
+                  It is important to check that the manager's internal representation of the data is in sync with the real world space.
+                  This means that the manager's <span class="code">WorldToTileTranslation</span> and <span class="code">WorldToTileScale</span>
+                  properties must be set correctly to convert world coordinates into tile coordinates.
+                  You can easily check if that is the case by enabling the debug draw options on the manager.
+                  This will draw the tiles, their connections (portals), the blocked cells and optionally even more.
+                  The following example shows how the debug drawings align with the level geometry:<br>
+                  <img src="media/ManagerDebugDraw.jpg" alt="ManagerDebugDraw"><br>
+                </p>
+              </li>
               <br>
               <li>One of the most important parts of a good navigation outcome is good surface data quality.
                 The whole navigable area is divided into tiles, which are divided into individual cells with a cost value:<br>
