@@ -22,6 +22,8 @@ AFlowPathManager::AFlowPathManager()
     MaxAsyncFlowMapUpdatesPerTick = 50;
     CleanupFlowmapsAfterTicks = 500;
     CollisionChecking = false;
+    ReservedMovementSpeedFactor = 0.5f;
+    BlockedMovementSpeedFactor = 0.2f;
 
 #if WITH_EDITOR
     DrawAllBlockedCells = false;
@@ -280,6 +282,8 @@ void AFlowPathManager::Tick(float DeltaTime)
 #endif		// WITH_EDITOR
 
     TArray<UObject*> agentsToRemove;
+    blockedCells.Empty(agents.Num());
+    reservedCells.Empty(agents.Num());
     for (auto& agentPair : agents) {
         UObject* agent = agentPair.Key;
         AgentData& data = agentPair.Value;
@@ -317,12 +321,15 @@ void AFlowPathManager::Tick(float DeltaTime)
                 data.waypoints.Empty();
             }
             else if (!data.isPathDataDirty) {
-                INavAgent::Execute_UpdateAcceleration(agent, data.targetAcceleration);
-                data.isPathDataDirty = data.currentLocation != data.lastLocation || data.currentTarget != data.lastTarget;
-
-                if (CollisionChecking) {
-                    auto nextTarget = toAbsoluteTileLocationFloat(data.currentLocation) + data.targetAcceleration;
-                    reservedCells.Add(FIntPoint(nextTarget.X, nextTarget.Y));
+                if (data.currentLocation == data.lastLocation && data.currentTarget == data.lastTarget) {
+                    INavAgent::Execute_UpdateAcceleration(agent, data.targetAcceleration);
+                    if (CollisionChecking) {
+                        auto nextTarget = toAbsoluteTileLocationFloat(data.currentLocation) + data.targetAcceleration;
+                        reservedCells.Add(FIntPoint(nextTarget.X, nextTarget.Y), agent);
+                    }
+                }
+                else {
+                    data.isPathDataDirty = true;
                 }
             }
         }
@@ -383,12 +390,11 @@ void AFlowPathManager::updateDirtyPathData()
 
         int32 lookupIndex = flowPath->fastFlowMapLookup({ location, target }, nextPortal, connectedPortal, lookaheadPortal);
         if (lookupIndex < 0) {
-            UE_LOG(LogExec, Warning, TEXT("Unable to calculate flowmap value for agent %s"), *agentPair.Key->GetName());
-            data.current.isPathfindingActive = false;
+            UE_LOG(LogExec, Warning, TEXT("Unable to calculate flowmap value for agent %s, resetting pathfinding"), *agentPair.Key->GetFullName());
             data.targetAcceleration = FVector2D::ZeroVector;
-            data.isPathDataDirty = false;
+            data.isPathDataDirty = true;
             data.waypoints.Empty();
-            INavAgent::Execute_TargetUnreachable(agentPair.Key);
+            INavAgent::Execute_UpdateAcceleration(agentPair.Key, data.targetAcceleration);
             continue;
         }
 
@@ -397,37 +403,37 @@ void AFlowPathManager::updateDirtyPathData()
         } else {
             auto absLocation = toAbsoluteTileLocation(data.currentLocation);
             auto nextLocation = absLocation + neighbors[lookupIndex];
-            if (!blockedCells.Contains(nextLocation) && !reservedCells.Contains(nextLocation)) {
+            auto reservedAgent = reservedCells.Find(nextLocation);
+            if (!blockedCells.Contains(nextLocation) && (reservedAgent == nullptr || *reservedAgent == agentPair.Key)) {
                 data.targetAcceleration = normalizedNeighbors[lookupIndex];
             } else {
                 // the target we want to steer to is blocked by another agent, so we try to steer to an adjacent tile if possible
-                bool foundAlternative = false;
+                float accelerationFactor = BlockedMovementSpeedFactor; 
                 for (auto& alternative : getAdjacentFreePoints(data.currentLocation, lookupIndex)) {
                     absLocation = toAbsoluteTileLocation(alternative.Key);
                     if (blockedCells.Contains(absLocation)) {
+                        // If we steer to a blocked cell without any alternative we slow down
                         continue;
                     }
-                    if (reservedCells.Contains(absLocation)) {
+                    reservedAgent = reservedCells.Find(absLocation);
+                    if (reservedAgent != nullptr && *reservedAgent != agentPair.Key) {
+                        // reserved cells are avoided as much as possible, but sometimes they are the only things left
                         lookupIndex = alternative.Value;
-                        foundAlternative = true;
+                        accelerationFactor = ReservedMovementSpeedFactor;
                         continue;
                     }
+                    // looks like this cell is free
                     lookupIndex = alternative.Value;
-                    foundAlternative = true;
+                    accelerationFactor = 1;
                     break;
                 }
-                if (foundAlternative) {
-                    // reserved cells are avoided as much as possible, but sometimes they are the only things left
-                    data.targetAcceleration = normalizedNeighbors[lookupIndex];
+                if (accelerationFactor != 1) {
+                    UE_LOG(LogExec, Warning, TEXT("Factor %f"), accelerationFactor);
                 }
-                else {
-                    // If we steer to a blocked cell without any alternative we slow down
-                    data.targetAcceleration = normalizedNeighbors[lookupIndex] * 0.2f;
-                }
+                data.targetAcceleration = normalizedNeighbors[lookupIndex] * accelerationFactor;
             }
-
             auto nextTarget = toAbsoluteTileLocationFloat(data.currentLocation) + data.targetAcceleration;
-            reservedCells.Add(FIntPoint(nextTarget.X, nextTarget.Y));
+            reservedCells.Add(FIntPoint(nextTarget.X, nextTarget.Y), agentPair.Key);
         }
 
         data.isPathDataDirty = false;

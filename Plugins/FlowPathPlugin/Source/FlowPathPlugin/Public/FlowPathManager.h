@@ -81,7 +81,7 @@ private:
     int32 ticksSinceLastCleanup;
     
     TSet<FIntPoint> blockedCells;
-    TSet<FIntPoint> reservedCells;
+    TMap<FIntPoint, UObject*> reservedCells;
 
     TUniquePtr<FQueuedThreadPool> Pool;
     std::list<FlowMapGenerationTask> generatorTasks;
@@ -158,6 +158,20 @@ public:
     */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath)
     bool CollisionChecking;
+
+    /**
+    * The speed factor an agent moves with if it is currently going to a cell another agent is also going to.
+    * If two agents happen to target the same cell, one of them is slowing down to give the other the right of way and avoid a collision.
+    */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath, meta = (ClampMin = "0", ClampMax = "1"))
+    float ReservedMovementSpeedFactor;
+
+    /**
+    * The speed factor an agent moves with if it is currently going to a cell another agent is occupying.
+    * As soon as the other agent has left the cell, the first agent moves with normal speed again.
+    */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = FlowPath, meta = (ClampMin = "0", ClampMax = "1"))
+    float BlockedMovementSpeedFactor;
 
     /**
     * The number of thread that should be used to generate flowmaps. A number <= 0 disables threaded flowmap generation.
