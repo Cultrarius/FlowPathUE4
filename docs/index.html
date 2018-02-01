@@ -66,7 +66,8 @@
         <h3>Table of contents</h3>
         <ol>
           <li><a href="#intro">How does it work</a></li>
-          <li><a href="#setup">Setup (+requirements)</a></li>
+          <li><a href="#requirements">Requirements and Limits</a></li>
+          <li><a href="#setup">Setup</a></li>
           <li><a href="#agent-config">NavAgent configuration</a></li>
           <li><a href="#manager-config">FlowPathManager configuration</a></li>
           <li><a href="#sources">Sources</a></li>
@@ -81,15 +82,33 @@
           steer a large amount of agents through a dynamic environment with minimal performance cost.
         </p>
         <p>
-          # TODO add some explanations
+	  This plugin features a grid-based pathfinding algorithm with the followig properties:
+	  <ul>
+            <li>Agents with the same target share search results, making it perfect for large crowds</li>
+            <li>Supports fully dynamic navigation data like a blocked road or a wall breach</li>
+            <li>Very fast path search even on large maps (several km across)</li>
+            <li>Simple collision avoidance for moving agents</li>
+            <li>Multithreaded</li>
+            <li>Does not depend on navmeshes (can be used together with navmeshes)</li>
+          </ul>
+	  The focus of the plugin lies on the first two points of the list: good performance with large crowds, even in a rapidly changing environment.
         </p>
+	<p>
+	  It does this by precomputing all possible shortest paths for a large number of grid points.
+	  To move an agent each tick it then only has to do a simple lookup for the precomputed value on the agent's position instead of a new path calculation.
+	  Since it would be too expensive to compute the shortest path from <i>all</i> points on the map, only points close to the actual path of an agent are precomputed.
+	</p>
+	<p>
+	  The precomputed values are stored in so-called "flow fields".
+	  They are basically vector fields where each grid cell points to one of the neighboring eight grid cells.
+	  No matter where an agent starts in a flow field, following the vectors of the field ensures that it always takes the shortest path to its target.
+	</p>
         <hr>
 
-        <h3>
-          <a id="setup" class="anchor" href="#setup" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
-          Setup</h3>
+	<h3>
+          <a id="requirements" class="anchor" href="#requirements" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Requirements and Limits</h3>
         <p>
-          <b>Requirements</b><br>
           Before the plugin can be used, make sure that you can check off all of the following points:
           <ul>
             <li>UE4 comes with a <a href="https://docs.unrealengine.com/latest/INT/Resources/ContentExamples/NavMesh/index.html">built-in navigation system</a> based on navmeshes.
@@ -99,6 +118,11 @@
             <li>The plugin does not automatically sync any network calls or data. Syncing the positions and velocities of any pawns and surface data is still your responsibility.</li>
           </ul>
         </p>
+        <hr>
+
+        <h3>
+          <a id="setup" class="anchor" href="#setup" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>
+          Setup</h3>
         <p>
           <b>Getting started</b>
           <p>
@@ -132,6 +156,12 @@
               <li>One of the most important parts of a good navigation outcome is good surface data quality.
                 The whole navigable area is divided into tiles, which are divided into individual cells with a cost value:<br>
                 <img src="media/surface.svg" alt="surface"><br>
+                <p>
+                  Each tile is a square of cells and has integer coordinates (e.g. x = 4, y = -3) that describe its position.
+                  There is no limit on the number of tiles in a map.
+                  It is also not required to connect all of the tiles with each other;
+                  it is perefctly valid to have 'islands' of navigable tiles disconnected from the other tiles.
+                </p>
                 <p>
                   Cells can have a cost value between 1 and 255 (0 is reserved and not allowed).
                   A value of 1 means almost free traversal and 254 has the highest traversal cost possible.
