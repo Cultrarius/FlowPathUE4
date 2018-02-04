@@ -14,13 +14,11 @@ DECLARE_STATS_GROUP(TEXT("FlowPath"), STATGROUP_FlowPath, STATCAT_Advanced);
 
 namespace flow {
 
-    struct AStarTile {
+    struct AStarNode {
         int32 pointCost;
         int32 goalCost;
         FIntPoint location;
-        FIntPoint parentTile;
-        FIntPoint nextOpen;
-        FIntPoint previousOpen;
+        FIntPoint parentNode;
         bool open;
     };
 
@@ -98,9 +96,9 @@ namespace flow {
 
         static int32 distance(FIntPoint p1, FIntPoint p2);
 
-        void initializeFrontier(const FIntPoint& frontier, TArray<bool>& initializedTiles, TArray<AStarTile>& tiles, const FIntPoint& goal, std::list<FIntPoint>& openTiles) const;
+        void initializeFrontier(const FIntPoint& frontier, TArray<bool>& initializedNodes, TArray<AStarNode>& tiles, const FIntPoint& goal, std::list<FIntPoint>& openNodes) const;
 
-        void initFrontierTile(const FIntPoint& tile, TArray<bool> &initializedTiles, TArray<AStarTile> &tiles, int32 frontierIndex, const FIntPoint & goal, const FIntPoint& frontier, std::list<FIntPoint>& openTiles) const;
+        void initFrontierNode(const FIntPoint& tile, TArray<bool> &initializedNodes, TArray<AStarNode> &nodes, int32 frontierIndex, const FIntPoint & goal, const FIntPoint& frontier, std::list<FIntPoint>& openNodes) const;
         
         bool isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const;
 

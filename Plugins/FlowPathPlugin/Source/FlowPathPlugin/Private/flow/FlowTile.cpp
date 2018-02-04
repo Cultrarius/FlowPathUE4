@@ -247,32 +247,32 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         int32 tileSize = tileLength * tileLength;
         TArray<bool> initializedTiles;
         initializedTiles.AddZeroed(tileSize);
-        TArray<AStarTile> tiles;
+        TArray<AStarNode> nodes;
         list<FIntPoint> openTiles;
-        tiles.AddUninitialized(tileSize);
+        nodes.AddUninitialized(tileSize);
 
         int32 goalIndex = toIndex(end);
         int32 startIndex = toIndex(start);
 
-        tiles[startIndex].pointCost = 0;
+        nodes[startIndex].pointCost = 0;
         initializedTiles[startIndex] = true;
-        tiles[startIndex].location = start;
-        tiles[startIndex].goalCost = distance(start, end);
-        tiles[startIndex].open = false;
+        nodes[startIndex].location = start;
+        nodes[startIndex].goalCost = distance(start, end);
+        nodes[startIndex].open = false;
 
         FIntPoint frontier = start;
         do {
-            initializeFrontier(frontier, initializedTiles, tiles, end, openTiles);
+            initializeFrontier(frontier, initializedTiles, nodes, end, openTiles);
             int32 frontierCost = -1;
 
             auto it = openTiles.begin();
             auto selected = openTiles.end();
             for (;it != openTiles.end(); it++) {
                 int32 i = toIndex(*it);
-                check(initializedTiles[i] && tiles[i].open);
-                if (frontierCost < 0 || frontierCost > tiles[i].goalCost) {
+                check(initializedTiles[i] && nodes[i].open);
+                if (frontierCost < 0 || frontierCost > nodes[i].goalCost) {
                     selected = it;
-                    frontierCost = tiles[i].goalCost;
+                    frontierCost = nodes[i].goalCost;
                 }
             }
             if (selected != openTiles.end()) {
@@ -288,9 +288,9 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
         int32 pathCost = getData(start);
         while (frontier != start) {
             wayPoints.Add(frontier);
-            int32 tileIndex = toIndex(frontier);
-            pathCost += getData()[tileIndex];
-            frontier = tiles[tileIndex].parentTile;
+            int32 nodeIndex = toIndex(frontier);
+            pathCost += getData()[nodeIndex];
+            frontier = nodes[nodeIndex].parentNode;
         }
         wayPoints.Add(start);
 
@@ -513,92 +513,92 @@ bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& 
     return data[index1] != BLOCKED || data[index2] != BLOCKED;
 }
 
-void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>& initializedTiles, TArray<AStarTile>& tiles, const FIntPoint & goal, list<FIntPoint>& openTiles) const
+void flow::FlowTile::initializeFrontier(const FIntPoint& frontier, TArray<bool>& initializedNodes, TArray<AStarNode>& nodes, const FIntPoint & goal, list<FIntPoint>& openNodes) const
 {
     int32 frontierIndex = toIndex(frontier);
-    tiles[frontierIndex].open = false;
+    nodes[frontierIndex].open = false;
 
-    // init north tile
+    // init north node
     if (frontier.Y > 0) {
-        FIntPoint tile = frontier + FIntPoint(0, -1);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(0, -1);
+        initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
     }
 
-    // init north-west tile
+    // init north-west node
     if (frontier.Y > 0 && frontier.X > 0) {
-        FIntPoint tile = frontier + FIntPoint(-1, -1);
-        if (isCrossMoveAllowed(tile, frontier)) {
-            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(-1, -1);
+        if (isCrossMoveAllowed(node, frontier)) {
+            initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
         }
     }
 
-    // init west tile
+    // init west node
     if (frontier.X > 0) {
-        FIntPoint tile = frontier + FIntPoint(-1, 0);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(-1, 0);
+        initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
     }
 
-    // init south-west tile
+    // init south-west node
     if (frontier.X > 0 && frontier.Y < (tileLength - 1)) {
-        FIntPoint tile = frontier + FIntPoint(-1, 1);
-        if (isCrossMoveAllowed(tile, frontier)) {
-            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(-1, 1);
+        if (isCrossMoveAllowed(node, frontier)) {
+            initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
         }
     }
 
-    // init south tile
+    // init south node
     if (frontier.Y < (tileLength - 1)) {
-        FIntPoint tile = frontier + FIntPoint(0, 1);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(0, 1);
+        initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
     }
 
-    // init south-east tile
+    // init south-east node
     if (frontier.Y < (tileLength - 1) && frontier.X < (tileLength - 1)) {
-        FIntPoint tile = frontier + FIntPoint(1, 1);
-        if (isCrossMoveAllowed(tile, frontier)) {
-            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(1, 1);
+        if (isCrossMoveAllowed(node, frontier)) {
+            initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
         }
     }
 
-    // init east tile
+    // init east node
     if (frontier.X < (tileLength - 1)) {
-        FIntPoint tile = frontier + FIntPoint(1, 0);
-        initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(1, 0);
+        initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
     }
 
-    // init north-east tile
+    // init north-east node
     if (frontier.X < (tileLength - 1) && frontier.Y > 0) {
-        FIntPoint tile = frontier + FIntPoint(1, -1);
-        if (isCrossMoveAllowed(tile, frontier)) {
-            initFrontierTile(tile, initializedTiles, tiles, frontierIndex, goal, frontier, openTiles);
+        FIntPoint node = frontier + FIntPoint(1, -1);
+        if (isCrossMoveAllowed(node, frontier)) {
+            initFrontierNode(node, initializedNodes, nodes, frontierIndex, goal, frontier, openNodes);
         }
     }
 }
 
-void flow::FlowTile::initFrontierTile(const FIntPoint& tile, TArray<bool> &initializedTiles, TArray<AStarTile> &tiles, int32 frontierIndex, const FIntPoint & goal, const FIntPoint& frontier, list<FIntPoint>& openTiles) const
+void flow::FlowTile::initFrontierNode(const FIntPoint& node, TArray<bool> &initializedTiles, TArray<AStarNode> &nodes, int32 frontierIndex, const FIntPoint & goal, const FIntPoint& frontier, list<FIntPoint>& openNodes) const
 {
     auto& data = getData();
-    int32 tileIndex = toIndex(tile);
-    int32 pointCost = tiles[frontierIndex].pointCost + data[tileIndex];
-    int32 goalCost = pointCost + distance(tile, goal);
-    if (!initializedTiles[tileIndex]) {
-        initializedTiles[tileIndex] = true;
-        if (data[tileIndex] == BLOCKED) {
-            tiles[tileIndex].open = false;
+    int32 nodeIndex = toIndex(node);
+    int32 pointCost = nodes[frontierIndex].pointCost + data[nodeIndex];
+    int32 goalCost = pointCost + distance(node, goal);
+    if (!initializedTiles[nodeIndex]) {
+        initializedTiles[nodeIndex] = true;
+        if (data[nodeIndex] == BLOCKED) {
+            nodes[nodeIndex].open = false;
         }
         else {
-            tiles[tileIndex].open = true;
-            tiles[tileIndex].location = tile;
-            tiles[tileIndex].pointCost = pointCost;
-            tiles[tileIndex].goalCost = goalCost;
-            tiles[tileIndex].parentTile = frontier;
-            openTiles.push_back(tile);
+            nodes[nodeIndex].open = true;
+            nodes[nodeIndex].location = node;
+            nodes[nodeIndex].pointCost = pointCost;
+            nodes[nodeIndex].goalCost = goalCost;
+            nodes[nodeIndex].parentNode = frontier;
+            openNodes.push_back(node);
         }
     }
-    else if (tiles[tileIndex].open && goalCost < tiles[tileIndex].goalCost) {
-        tiles[tileIndex].pointCost = pointCost;
-        tiles[tileIndex].goalCost = goalCost;
-        tiles[tileIndex].parentTile = frontier;
+    else if (nodes[nodeIndex].open && goalCost < nodes[nodeIndex].goalCost) {
+        nodes[nodeIndex].pointCost = pointCost;
+        nodes[nodeIndex].goalCost = goalCost;
+        nodes[nodeIndex].parentNode = frontier;
     }
 }
 
