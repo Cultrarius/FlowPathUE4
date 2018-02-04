@@ -144,5 +144,7 @@ namespace flow {
         void cacheFlowMap(const Portal * resultStartPortal, const Portal * resultEndPortal, const TArray<flow::EikonalCellValue>& result);
 
         void deleteAllFlowMaps();
+
+        void invalidatedTile(const FlowTile& invalidTile);
     };
 }

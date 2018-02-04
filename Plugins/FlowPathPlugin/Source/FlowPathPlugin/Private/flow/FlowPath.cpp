@@ -62,7 +62,12 @@ bool FlowPath::updateMapTile(int32 tileX, int32 tileY, const TArray<uint8> &tile
     if (existingTile != nullptr) {
         clearTileFromWaypointCache(**existingTile);
         (*existingTile)->removeConnectedPortals();
-        // TODO invalidate lookahead flowmaps
+        for (auto& neighbor : neighbors) {
+            auto neighborTile = tileMap.Find(coord + neighbor);
+            if (neighborTile != nullptr) {
+                (*neighborTile)->invalidatedTile(**existingTile);
+            }
+        }
         tileMap.Remove(coord);
     }
     tileMap.Add(coord, TUniquePtr<FlowTile>(tile));

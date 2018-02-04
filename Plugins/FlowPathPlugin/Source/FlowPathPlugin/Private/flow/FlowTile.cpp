@@ -281,7 +281,6 @@ PathSearchResult flow::FlowTile::findPath(FIntPoint start, FIntPoint end)
             }
         } while (frontier != end);
 
-        // TODO add waypoint smoothing?
         int32 pathCost = getData(start);
         while (frontier != start) {
             wayPoints.Add(frontier);
@@ -315,6 +314,7 @@ const TArray<EikonalCellValue>& flow::FlowTile::createMapToPortal(const Portal* 
 {
     check(targetPortal);
     check(connectedPortal);
+    check(portals.Contains(*targetPortal));
     check(targetPortal->connected.Contains(connectedPortal));
     FlowPortalKey key = { targetPortal, connectedPortal };
     if (portalEikonalMaps.Contains(key)) {
@@ -477,6 +477,21 @@ void flow::FlowTile::cacheFlowMap(const Portal * resultStartPortal, const Portal
 void flow::FlowTile::deleteAllFlowMaps()
 {
     portalEikonalMaps.Empty();
+}
+
+void flow::FlowTile::invalidatedTile(const FlowTile& invalidTile)
+{
+    TArray<FlowPortalKey> invalidMapKeys;
+    for (auto& portal : invalidTile.portals) {
+        for (auto& pair : portalEikonalMaps) {
+            if (pair.Key.targetPortal == &portal) {
+                invalidMapKeys.Add(pair.Key);
+            }
+        }
+    }
+    for (auto& key : invalidMapKeys) {
+        portalEikonalMaps.Remove(key);
+    }
 }
 
 bool flow::FlowTile::isCrossMoveAllowed(const FIntPoint& from, const FIntPoint& to) const
